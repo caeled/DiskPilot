@@ -1,6 +1,6 @@
 # USBDoctor.Core.psm1 - engine for USBDoctor (diagnose and repair common USB drive problems)
 # Windows PowerShell 5.1. Read-only checks run as a normal user; repairs and raw sector reads need Administrator.
-$script:Version      = '1.0.0'
+$script:Version      = '1.1.0'
 $script:LogFile      = Join-Path $env:ProgramData 'USBDoctor\USBDoctor.log'
 $script:AllowVirtual = $false
 $script:UsbSubgroup  = '2a737441-1930-4402-8d77-b2bebba308a3'   # power plan: USB settings
@@ -238,12 +238,144 @@ public static class UsbDocNative {
     }
     return first;
   }
+  // Wipe (Prepare & Tools, not a repair): mode 0 = zeros, 1 = pseudo-random (reproducible from seed, so samples can be verified).
+  public static void WipeSlice(SafeFileHandle h, long off, long len, int mode, uint seed) {
+    byte[] b = new byte[CHUNK]; long done = 0;
+    while (done < len) {
+      int n = (int)Math.Min((long)CHUNK, len - done);
+      if (mode == 1) FillPattern(b, n, off + done, seed); else if (done == 0) Array.Clear(b, 0, b.Length);
+      WriteAt(h, off + done, b, n); done += n;
+    }
+  }
+  // 0 = matches, 1 = mismatch, 2 = read error.
+  public static int WipeCheck(SafeFileHandle h, long off, int len, int mode, uint seed) {
+    byte[] want = new byte[len]; if (mode == 1) FillPattern(want, len, off, seed);
+    byte[] got = new byte[len]; int err;
+    if (ReadAt(h, off, got, len, 30000, out err) != len) return 2;
+    for (int i = 0; i < len; i++) if (want[i] != got[i]) return 1;
+    return 0;
+  }
+  // Write a byte buffer that may be shorter than a sector: pads with zeros up to the sector size.
+  public static void WritePadded(SafeFileHandle h, long off, byte[] data, int count, int sector) {
+    int n = ((count + sector - 1) / sector) * sector; byte[] b = new byte[n]; Array.Copy(data, b, count); WriteAt(h, off, b, n);
+  }
+
   static string VetoName(int v) {
     switch (v) {
       case 0: return "none"; case 5: return "device is busy (pending close)"; case 6: return "files are open on the drive";
       case 7: return "device is in use"; case 8: return "a driver refused"; case 9: return "the device is not ejectable";
       case 11: return "insufficient rights"; default: return "type " + v;
     }
+  }
+}
+
+public class UsbDocBenchResult {
+  public double SeqWriteMBs = -1, SeqReadMBs = -1, RandWriteIops = -1, RandReadIops = -1;
+  public long Bytes, Mismatches, ReadErrors; public int RandWriteOps, RandReadOps; public string Note = "";
+}
+
+// Speed/health benchmark with unbuffered I/O (FILE_FLAG_NO_BUFFERING | FILE_FLAG_WRITE_THROUGH) and page-aligned buffers,
+// so the numbers are the drive's, not the Windows cache's. Every 4 KiB block carries its offset and seed and is verified on read.
+public static class UsbDocBench {
+  const uint GENERIC_READ = 2147483648u, GENERIC_WRITE = 1073741824u, SHARE_RW = 3, CREATE_ALWAYS = 2, OPEN_EXISTING = 3;
+  const uint NO_BUFFERING = 0x20000000, WRITE_THROUGH = 0x80000000;
+  const int MB = 1048576, K4 = 4096;
+  [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+  static extern SafeFileHandle CreateFile(string n, uint a, uint s, IntPtr sa, uint c, uint f, IntPtr t);
+  [DllImport("kernel32.dll", SetLastError = true)] static extern bool ReadFile(SafeFileHandle h, IntPtr b, int n, out int read, IntPtr ov);
+  [DllImport("kernel32.dll", SetLastError = true)] static extern bool WriteFile(SafeFileHandle h, IntPtr b, int n, out int written, IntPtr ov);
+  [DllImport("kernel32.dll", SetLastError = true)] static extern bool SetFilePointerEx(SafeFileHandle h, long dist, out long np, uint method);
+  [DllImport("kernel32.dll", SetLastError = true)] static extern IntPtr VirtualAlloc(IntPtr a, UIntPtr size, uint type, uint protect);
+  [DllImport("kernel32.dll", SetLastError = true)] static extern bool VirtualFree(IntPtr a, UIntPtr size, uint type);
+
+  static SafeFileHandle Open(string path, bool write, bool create) {
+    SafeFileHandle h = CreateFile(path, write ? (GENERIC_READ | GENERIC_WRITE) : GENERIC_READ, SHARE_RW, IntPtr.Zero, create ? CREATE_ALWAYS : OPEN_EXISTING, NO_BUFFERING | WRITE_THROUGH, IntPtr.Zero);
+    if (h.IsInvalid) throw new IOException("Cannot open " + path + " unbuffered (Win32 error " + Marshal.GetLastWin32Error() + ")");
+    return h;
+  }
+  static byte[] Base(uint seed) { byte[] b = new byte[MB]; new Random((int)(seed & 0x7FFFFFFF)).NextBytes(b); return b; }
+  // Expected content of the 4 KiB-aligned range [off, off+len) into a managed buffer.
+  static void Expected(byte[] bas, byte[] dst, long off, int len, uint seed) {
+    for (int i = 0; i < len; i += K4) {
+      long o = off + i; Array.Copy(bas, (int)(o % MB), dst, i, K4);
+      byte[] ob = BitConverter.GetBytes(o); Array.Copy(ob, 0, dst, i, 8);
+      byte[] sb = BitConverter.GetBytes(seed); Array.Copy(sb, 0, dst, i + 8, 4);
+    }
+  }
+  static void Seek(SafeFileHandle h, long off) { long np; if (!SetFilePointerEx(h, off, out np, 0)) throw new IOException("Seek to " + off + " failed (Win32 error " + Marshal.GetLastWin32Error() + ")"); }
+  static void Write(SafeFileHandle h, IntPtr buf, int n, long off) { int w; Seek(h, off); if (!WriteFile(h, buf, n, out w, IntPtr.Zero) || w != n) throw new IOException("Unbuffered write at " + off + " failed (Win32 error " + Marshal.GetLastWin32Error() + ")"); }
+  static bool Read(SafeFileHandle h, IntPtr buf, int n, long off) { int r; Seek(h, off); return ReadFile(h, buf, n, out r, IntPtr.Zero) && r == n; }
+  static bool Same(byte[] a, byte[] b, int n) { for (int i = 0; i < n; i++) if (a[i] != b[i]) return false; return true; }
+
+  // File mode: sequential write+read of 'bytes' (multiple of 1 MiB) to a temp file, then 4 KiB random write and read inside it.
+  public static UsbDocBenchResult FileBench(string path, long bytes, int randSeconds, int maxRandOps, uint seed) {
+    UsbDocBenchResult r = new UsbDocBenchResult(); r.Bytes = bytes;
+    byte[] bas = Base(seed); byte[] exp = new byte[MB]; byte[] got = new byte[MB];
+    IntPtr buf = VirtualAlloc(IntPtr.Zero, (UIntPtr)MB, 0x3000, 0x04);
+    if (buf == IntPtr.Zero) throw new OutOfMemoryException("VirtualAlloc failed");
+    try {
+      System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch();
+      using (SafeFileHandle h = Open(path, true, true)) {
+        double busy = 0;
+        for (long off = 0; off < bytes; off += MB) {
+          Expected(bas, exp, off, MB, seed); Marshal.Copy(exp, 0, buf, MB);
+          sw.Restart(); Write(h, buf, MB, off); busy += sw.Elapsed.TotalSeconds;
+        }
+        r.SeqWriteMBs = bytes / (double)MB / Math.Max(busy, 1e-6);
+      }
+      using (SafeFileHandle h = Open(path, false, false)) {
+        double busy = 0;
+        for (long off = 0; off < bytes; off += MB) {
+          sw.Restart(); bool ok = Read(h, buf, MB, off); busy += sw.Elapsed.TotalSeconds;
+          if (!ok) { r.ReadErrors++; continue; }
+          Marshal.Copy(buf, got, 0, MB); Expected(bas, exp, off, MB, seed); if (!Same(exp, got, MB)) r.Mismatches++;
+        }
+        r.SeqReadMBs = bytes / (double)MB / Math.Max(busy, 1e-6);
+      }
+      Random rnd = new Random((int)(seed & 0x7FFFFFFF) ^ 0x5bd1e995); long blocks = bytes / K4;
+      using (SafeFileHandle h = Open(path, true, false)) {
+        double busy = 0; System.Diagnostics.Stopwatch wall = System.Diagnostics.Stopwatch.StartNew();
+        while (r.RandWriteOps < maxRandOps && wall.Elapsed.TotalSeconds < randSeconds) {
+          long off = (long)(rnd.NextDouble() * blocks) * K4; if (off >= bytes) off = bytes - K4;
+          Expected(bas, exp, off, K4, seed); Marshal.Copy(exp, 0, buf, K4);
+          sw.Restart(); Write(h, buf, K4, off); busy += sw.Elapsed.TotalSeconds; r.RandWriteOps++;
+        }
+        r.RandWriteIops = r.RandWriteOps / Math.Max(busy, 1e-6);
+      }
+      using (SafeFileHandle h = Open(path, false, false)) {
+        double busy = 0; System.Diagnostics.Stopwatch wall = System.Diagnostics.Stopwatch.StartNew();
+        while (r.RandReadOps < maxRandOps && wall.Elapsed.TotalSeconds < randSeconds) {
+          long off = (long)(rnd.NextDouble() * blocks) * K4; if (off >= bytes) off = bytes - K4;
+          sw.Restart(); bool ok = Read(h, buf, K4, off); busy += sw.Elapsed.TotalSeconds; r.RandReadOps++;
+          if (!ok) { r.ReadErrors++; continue; }
+          Marshal.Copy(buf, got, 0, K4); Expected(bas, exp, off, K4, seed); if (!Same(exp, got, K4)) r.Mismatches++;
+        }
+        r.RandReadIops = r.RandReadOps / Math.Max(busy, 1e-6);
+      }
+    } finally { VirtualFree(buf, UIntPtr.Zero, 0x8000); }
+    return r;
+  }
+
+  // Read-only raw mode (administrator): sequential read of the first 'bytes' of the disk and 4 KiB random reads across all of it.
+  public static UsbDocBenchResult RawBench(string devicePath, long diskSize, long bytes, int randSeconds, int maxRandOps, uint seed) {
+    UsbDocBenchResult r = new UsbDocBenchResult(); if (bytes > diskSize) bytes = (diskSize / MB) * MB; r.Bytes = bytes; r.Note = "read-only";
+    IntPtr buf = VirtualAlloc(IntPtr.Zero, (UIntPtr)MB, 0x3000, 0x04);
+    if (buf == IntPtr.Zero) throw new OutOfMemoryException("VirtualAlloc failed");
+    try {
+      using (SafeFileHandle h = Open(devicePath, false, false)) {
+        System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch(); double busy = 0;
+        for (long off = 0; off + MB <= bytes; off += MB) { sw.Restart(); if (!Read(h, buf, MB, off)) r.ReadErrors++; busy += sw.Elapsed.TotalSeconds; }
+        r.SeqReadMBs = bytes / (double)MB / Math.Max(busy, 1e-6);
+        Random rnd = new Random((int)(seed & 0x7FFFFFFF)); long blocks = diskSize / K4; busy = 0;
+        System.Diagnostics.Stopwatch wall = System.Diagnostics.Stopwatch.StartNew();
+        while (r.RandReadOps < maxRandOps && wall.Elapsed.TotalSeconds < randSeconds) {
+          long off = (long)(rnd.NextDouble() * blocks) * K4; if (off + K4 > diskSize) off = diskSize - K4;
+          sw.Restart(); if (!Read(h, buf, K4, off)) r.ReadErrors++; busy += sw.Elapsed.TotalSeconds; r.RandReadOps++;
+        }
+        r.RandReadIops = r.RandReadOps / Math.Max(busy, 1e-6);
+      }
+    } finally { VirtualFree(buf, UIntPtr.Zero, 0x8000); }
+    return r;
   }
 }
 '@
@@ -316,8 +448,15 @@ function Invoke-Diskpart([string[]]$Lines) {
     try { $out = (& diskpart.exe /s $f 2>&1 | Out-String); $rc = $LASTEXITCODE } finally { Remove-Item -LiteralPath $f -ErrorAction SilentlyContinue }
     $tail = ($out -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -Last 4) -join ' | '
     Write-UDLog "diskpart: $tail"
-    if ($rc -ne 0 -or $out -match 'Virtual Disk Service error|DiskPart has encountered an error|is not supported|Access is denied') {
-        throw "diskpart failed (exit $rc): $tail"
+    # diskpart /s stops at the first failing command and exits non-zero (unless that command says noerr), so the exit
+    # code is the primary signal. 'online disk noerr' on a disk that is already online prints a harmless
+    # "Virtual Disk Service error: This disk is already online." and carries on: that one is not a failure.
+    $rest = [regex]::Replace($out, '(?is)Virtual Disk Service error:\s*(The|This) disk is already online\.?', '')
+    if ($rest.Length -ne $out.Length) { Write-UDLog 'diskpart: the disk was already online (harmless).' }
+    $err = @($rest -split "`r?`n" | Where-Object { $_ -match 'Virtual Disk Service error|DiskPart has encountered an error|is not supported|Access is denied' })
+    if ($rc -ne 0 -or $err.Count) {
+        $why = @($rest -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -Last 6 | ForEach-Object { $_.Trim() }) -join ' | '
+        throw "diskpart failed (exit $rc): $why"
     }
     $out
 }
@@ -1962,11 +2101,11 @@ function Start-UsbRescue {
 }
 
 # ------------------------------------------------------------------ report
-function New-UsbDoctorReport([string]$OutDir, [int]$Days = 7, $Diag) {
+function New-UsbDoctorReport([string]$OutDir, [int]$Days = 7, $Diag, [string[]]$ExtraText, [string]$ExtraHtml) {
     if (-not $OutDir) { $OutDir = if (Test-Path 'D:\') { 'D:\USB-Backups\Reports' } else { Join-Path $env:USERPROFILE 'Documents' } }
     if (-not (Test-Path $OutDir)) { New-Item -ItemType Directory -Path $OutDir -Force | Out-Null }
     if (-not $Diag) { $Diag = Invoke-UsbDiagnosis -Days $Days }
-    $lines = Format-UsbDiagnosis $Diag
+    $lines = @(Format-UsbDiagnosis $Diag) + @($ExtraText)
     $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
     $txt = Join-Path $OutDir "USBDoctor-$stamp.txt"; $html = Join-Path $OutDir "USBDoctor-$stamp.html"
     Set-Content -LiteralPath $txt -Value $lines -Encoding UTF8
@@ -1980,7 +2119,7 @@ function New-UsbDoctorReport([string]$OutDir, [int]$Days = 7, $Diag) {
         [void]$sb.Append(("<tr><td>{0}</td><td>{1}<br>{2}</td><td style='color:{3}'><b>{4}</b></td><td>{5}</td><td>{6}<br><i>To change: {7}</i></td></tr>" -f $r.Disk.Number, [Net.WebUtility]::HtmlEncode($r.Disk.Model), [Net.WebUtility]::HtmlEncode($r.Disk.Summary), $color[$r.Level], [Net.WebUtility]::HtmlEncode($r.Verdict), [Net.WebUtility]::HtmlEncode($r.Assessment.FaultOwner), $act, [Net.WebUtility]::HtmlEncode($r.Assessment.Change)))
     }
     if (-not $Diag.Disks.Count) { [void]$sb.Append('<tr><td colspan=5>No USB drives attached.</td></tr>') }
-    [void]$sb.Append('</table><h3>Full details</h3><pre>' + [Net.WebUtility]::HtmlEncode(($lines -join "`r`n")) + '</pre></body></html>')
+    [void]$sb.Append('</table>'); if ($ExtraHtml) { [void]$sb.Append($ExtraHtml) }; [void]$sb.Append('<h3>Full details</h3><pre>' + [Net.WebUtility]::HtmlEncode(($lines -join "`r`n")) + '</pre></body></html>')
     Set-Content -LiteralPath $html -Value $sb.ToString() -Encoding UTF8
     Write-UDLog "Report written: $txt and $html"
     [pscustomobject]@{ Text = $txt; Html = $html }
@@ -1992,4 +2131,6 @@ Export-ModuleMember -Function Set-UDConfig, Get-UDLogFile, Get-UDVersion, Write-
     Set-UsbDriveLetter, Enable-UsbAutomount, Set-UsbDiskOnline, Clear-UsbReadOnly, Invoke-UsbChkdsk, Disable-UsbSelectiveSuspend, Remove-UsbGhostDevices, Reset-UsbDevice,
     Dismount-UsbDrive, Convert-ImageUsbFile, Invoke-ImageUsbFix, Restore-UsbBootSector, Restore-UsbGpt, Test-UsbCapacity, Test-DiskBlank, Expand-UsbPartition, Convert-UsbToNtfs,
     Start-UsbRescue, New-UsbDoctorReport, Get-DiskOfLetter, Get-UDHistory, Get-DeviceHistoryRecord, Get-DeviceImage, Set-Tier0Result, Test-RawRead, Test-MachineHealth,
-    Get-PartitionFsInfo, Get-GptInfo, Get-GateStatus, Assert-WriteGate, Test-VolumeAccess, Get-UsbImagerPath
+    Get-PartitionFsInfo, Get-GptInfo, Get-GateStatus, Assert-WriteGate, Test-VolumeAccess, Get-UsbImagerPath,
+    Invoke-Diskpart, New-Plan, Assert-SameDisk, Lock-DiskVolumes, Get-FreeBytes, Update-DeviceHistory, Get-DyingSignatures, Assert-Admin, Save-UDHistory,
+    Get-DeviceRecord, Get-PortKey, Read-DiskBytes, Get-ProtectedDiskNumbers, Get-DiskNumberOfPath, Invoke-WithTimeout, Get-PartLetter

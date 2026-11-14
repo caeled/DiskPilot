@@ -2,6 +2,87 @@
 
 All notable changes to this project are documented here.
 
+## [0.3.0] - 2026-11-14
+
+### USBDoctor (`usbdoctor/`) 1.1.0 - Prepare & Tools (not repairs)
+- New module `USBDoctor.Tools.psm1`, separate from the repair engine, with its own switches and window tab,
+  *Prepare / Tools (not repairs)*. The catalog rule stands: **format is never a repair**. The repair engine
+  (`USBDoctor.Core.psm1`) still has no format, initialize or clean code. Erasing tools are refused on non-USB and
+  system disks (C:, D:, Windows, boot, pagefile), on dying-media signatures, on recorded counterfeits and on
+  read-only drives. They show a plan that says whether the stick holds files and offers a Rescue copy first, then
+  need typed `ERASE <n>` and re-check the disk's identity before writing.
+- `-Format`: new MBR (Auto; GPT above 2 TB) or GPT table, one 1 MiB-aligned full-size partition, NTFS / exFAT
+  (default) / FAT32, label and letter. FAT32 above 32 GB is refused with a clear message (exFAT/NTFS or
+  `-SizeMB 32000`).
+- `-Wipe -Passes Zero|Random`: one pass over the whole stick with progress, ETA and Stop, then a verify sample
+  (first/last MiB + 64 random MiB). The wear-leveling limit is documented: not guaranteed erasure; encrypt, or
+  destroy the stick physically.
+- `-MakeBootable -Iso`: hybrid ISOs are written raw and verified by read-back. Windows installers get an active
+  FAT32 partition, files copied from the read-only mounted ISO, `install.wim` over 4 GB split to `.swm` with
+  `dism /Split-Image`, and `bootsect /nt60` when the ISO has it. NTFS mode is optional (legacy BIOS; no UEFI:NTFS
+  helper). Optional `-Sha256` check before writing.
+- `-Benchmark -Letter X`: unbuffered (`NO_BUFFERING` + `WRITE_THROUGH`) sequential and 4 KiB random read/write
+  on a temp file (default 256 MB), every block verified, free space checked, temp file deleted.
+  `-Benchmark -ReadOnly -Disk N`: raw reads only. Results are kept in `history.json`; a slowdown over 30% against
+  the median of earlier runs is flagged.
+- `-Recover -Image`: copies readable files out of a rescue image attached read-only (raw images get a temporary
+  VHD footer, removed exactly afterwards). `-Carve` runs PhotoRec if it is installed. Nothing is downloaded: the
+  TestDisk download page is shown instead. The source stick is never touched.
+- `-Watch Install|Uninstall|Status|Run [-DryRun]`: non-elevated scheduled task (at logon and every 30 minutes,
+  hidden) that records read errors, drop-outs and capacity changes per drive in `history.json` and notifies (toast,
+  BurntToast or msg) when errors rise or a verdict changes.
+- `-PortMap [-Html]`: controllers, root hubs, hubs, ports and devices, with per-port errors and drops from the
+  history and user port labels (`-LabelPort`, `port-labels.json`). Shown as text, as a section of the HTML/TXT
+  `-Report`, and as a tree on the window's *Port map* tab.
+- `-PreviewOnly` prints the plan of any Prepare tool without UAC.
+
+### Docs
+- Catalog: new "Prepare & Tools — destinations, not repairs" section that keeps "format is never a repair"
+  explicit. The MBR refusal is clarified to cover repairs. PDF re-rendered.
+- USBDoctor README: Prepare & Tools table, safety rules, wear-leveling note, limitations.
+
+### Fixed after the first elevated VHD test run (2026-11-14)
+- Format, wipe and the bootable maker reported `diskpart failed (exit 0)` although diskpart had succeeded:
+  `online disk noerr` on a disk that is already online prints a harmless "Virtual Disk Service error: This disk is
+  already online." The diskpart wrapper now trusts the exit code first, ignores only that message, and still fails on
+  any other VDS error, "DiskPart has encountered an error", "not supported" or "Access is denied". After a wipe or
+  raw-ISO clean, USBDoctor checks that the disk really has no partitions before writing; format already checked the
+  new volume and its file system.
+- Bootable (Windows mode) no longer stops on `System Volume Information` (access denied) when the source volume has
+  one: that folder and `$RECYCLE.BIN` are skipped when listing, copying and verifying.
+- Recovery from a rescue image waits for Windows to list the attached image's partitions and mount its volume (up
+  to ~25 s instead of a fixed 2 s), brings an image that arrives offline online (that writes nothing to it), retries
+  the drive letter and falls back to the volume GUID path. When a partition still can't be read, the reason is given.
+- `-Benchmark -Letter` accepts `X`, `X:` and `X:\`; `-Format -Letter` accepts `X:\` too.
+- Recovery could not read an NTFS image that was taken while the volume was mounted, or from a stick pulled without
+  "Safely Remove" (found in the fifth elevated run, G36/G37). The Windows log showed NTFS refusing the read-only mount
+  with `{Write Protect Error}` (0xC00000A2, "Volume restart applied: false"): the NTFS journal has to be replayed
+  before the volume mounts, and the replay writes. USBDoctor now attaches the image read-only first; when a partition's
+  file system will not mount, it detaches and re-attaches through a temporary differencing (overlay) disk in `%TEMP%`.
+  The image is only the read-only parent, the replay goes into the overlay, and the overlay is deleted afterwards
+  (an interrupted run cleans it up next time). A volume whose file system failed to mount is now recognised at once:
+  Windows reports it as `Unknown`, not `RAW`, so the old check waited the full 15 s and never named the cause.
+- The folder recovered files were copied into (`part1-<label>`) was hidden: robocopy gives the destination folder the
+  Hidden+System attributes of the source volume root. USBDoctor now clears both after each copy (found in the
+  recovery-only re-run; reproduced read-only with `robocopy H:\ <temp> /LEV:1 /XF * /XD *`).
+- `Invoke-ImageRecovery -ForceOverlay` (module only, for tests and diagnosis) reads every partition through the
+  overlay, so the overlay path is tested even when the image comes out clean.
+- The overlay path failed with "The property 'Text' cannot be found on this object" the first time it ran elevated:
+  the per-partition copy returned its results wrapped in one more array. The same mistake made an image with two or more
+  partitions retry every partition through the overlay and fail to add up the copied-file counts. Fixed, and checked
+  with a non-elevated mock test (mocked attach, real wrap, robocopy and cleanup).
+
+### Test status
+- Parse, import and non-elevated tests pass. These cover the benchmark logic against a test folder, the image-wrap
+  round trip, the plans and refusals, the port map, port labels, health-watch dry runs, the window smoke test, and
+  (new) the diskpart success detection against recorded real outputs and the System Volume Information skip.
+- First elevated VHD run: 98 passed, 22 failed. Every refusal held (system disks, wrong phrases, dying drives,
+  oversized ISOs). The failures were the diskpart bug above and its knock-on effects, the recovery timing, and harness
+  bugs (`-SimulateWrapAt 32MB` passed as text through `powershell -File`; a GPT damage step that did not stick; it now patches the detached VHD file).
+- Fifth elevated VHD run: 110 passed, 2 failed (G36/G37, the read-only NTFS mount above). The image hash and length
+  stayed unchanged. Recovery-only re-run (`run-recovery.ps1`): files copied, but into a hidden folder (fixed above);
+  the next re-run is pending.
+
 ## [0.2.0] - 2026-11-14
 
 ### Docs

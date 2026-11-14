@@ -9,7 +9,9 @@ gate the repair must pass.
   Formatting is something you choose here deliberately, never a "repair".
 - **USBImager** (`usbimager/`): capture a stick to an image, burn an image to a stick (whole-drive erase,
   typed `ERASE <n>`).
-- **USBDoctor** (`usbdoctor/`): read-only diagnosis, fault owner, gated repairs, rescue copies.
+- **USBDoctor** (`usbdoctor/`): read-only diagnosis, fault owner, gated repairs, rescue copies; plus a
+  separate Prepare & Tools area (format, wipe, bootable maker, benchmark, recovery, health watch, port map) that
+  is never offered as a repair.
 
 "Gated" means the repair needs a completed USBDoctor Rescue image of that drive on file, or a typed
 `REPAIR <n>` that accepts the risk. It is refused outright when the drive shows dying-media signatures.
@@ -318,15 +320,52 @@ Case: a letter-less stick that was never broken.
 - `-FixImageUsbShift -Image file.img` fixes an existing image file without touching any disk.
 - USBImager's raw burn also detects the header itself.
 
+## Prepare & Tools — destinations, not repairs
+
+**Format is never a repair.** Nothing in the tiers above is fixed by formatting. A format prompt on a RAW volume
+(#5), an unreadable file system (#12), or a stick that drops to zero (#15) is the trap, not the cure. USBDoctor's
+diagnosis never suggests a format, and its repair engine contains no format, initialize or clean code.
+
+Some jobs really do start from an empty stick: a fresh file system, a secure wipe before passing it on, a
+bootable installer. Those are **destinations the user chooses**, kept in a separate, clearly labelled area. On the
+command line they have their own switches; in the window they sit on their own tab, *Prepare / Tools (not
+repairs)*, with a red warning. They build a brand-new partition table from scratch. The rule "never write an MBR"
+applies to repairs: a repair can't rebuild what has no backup. These tools don't repair. They replace the whole
+layout, after the user has been shown what will be lost.
+
+Every erasing tool (format, wipe, bootable maker) follows the same rules:
+
+- **USB disks only.** The disks holding C:, D:, Windows, boot or the pagefile are refused, and so is anything not on
+  the USB bus.
+- **Not on a dying drive.** Dying-media signatures refuse it: image what you can. It is also refused on a stick
+  the capacity test recorded as counterfeit (#13), because data would land on flash that isn't there, and on a
+  read-only drive (#8).
+- **Plan first.** The preview says what will be erased, whether the stick holds files, and whether a Rescue image
+  exists. If it holds files and has no image, a Rescue copy is offered before anything else.
+- **Typed `ERASE <n>`** and an identity re-check right before writing.
+
+| Tool | USBDoctor switch | Notes |
+|---|---|---|
+| Format / prepare | `-Format -Disk N [-FileSystem exFAT\|NTFS\|FAT32] [-Label X] [-Letter Y] [-PartitionStyle Auto\|MBR\|GPT]` | New MBR (default for removable sticks, GPT above 2 TB) or GPT table, one full-size partition aligned at 1 MiB. FAT32 above 32 GB is refused with a clear message (use exFAT/NTFS, or `-SizeMB 32000`). |
+| Wipe | `-Wipe -Disk N [-Passes Zero\|Random]` | One pass over every byte, with progress and a verify sample. **Wear leveling:** flash controllers retire and remap blocks, and old data in retired blocks can survive any overwrite. A wipe is not guaranteed erasure: encrypt from the start, or destroy the stick physically if it held sensitive data unencrypted. |
+| Bootable maker | `-MakeBootable -Iso file -Disk N [-Mode Auto\|Windows\|Raw] [-Sha256 hex]` | Hybrid ISOs (most Linux installers) are written raw, like `dd`, and verified by read-back. Windows installers get an active FAT32 partition with `install.wim` split into `.swm` parts by DISM when it exceeds 4 GB. NTFS is optional; it boots legacy BIOS only, because no UEFI:NTFS helper is added. The SHA-256 is checked before anything is written. |
+| Benchmark | `-Benchmark -Letter X` / `-Benchmark -ReadOnly -Disk N` | Unbuffered sequential and 4 KiB random reads and writes on a temp file, data verified, temp file deleted. `-ReadOnly` uses raw reads only. Results are kept per stick, and a slowdown of more than 30% against earlier runs is flagged, which is an early sign of wearing flash (#14/#15). Not run on dying drives. |
+| Recover from an image | `-Recover -Image file.img [-OutDir dir] [-Carve]` | The #12 path: works on the Rescue image only, attached read-only, and **never writes to the source stick**. Copies readable files. `-Carve` hands the image to PhotoRec (TestDisk suite) if it is installed; USBDoctor never downloads it and points to https://www.cgsecurity.org/wiki/TestDisk_Download instead. |
+| Health watch | `-Watch Install\|Uninstall\|Status\|Run [-DryRun]` | A non-elevated scheduled task (at logon and every 30 minutes) that logs read errors, drop-outs and capacity changes into the history and notifies when they rise or a verdict changes. This catches #14/#15 early. |
+| Port map | `-PortMap`, `-LabelPort name -Disk N` | Tree of host controllers, hubs, ports and devices, with errors and drops per port from the history. It supports Tier 0: the same stick failing on one port only points at the connection. |
+
+**Tool coverage:** USBDoctor, Prepare & Tools (`USBDoctor.Tools.psm1`), separate from the repair engine.
+DiskPilot's `format` and USBImager's burn remain the other deliberate rebuild paths.
+
 ## Refusal list — the tool says no, and says why
 
 - Any write repair on a drive that disconnects during read-only diagnosis.
 - chkdsk or boot-sector repair on a drive whose raw first-sector read times out.
 - Capacity "repair" on a counterfeit (there is nothing to repair; the capacity was never there).
 - Clearing read-only a second time after it returned on replug.
-- Formatting anything as a "repair". Format is a destination the user chooses in DiskPilot proper (or a USBImager
-  burn), never a fix the repair tool proposes.
-- Writing an MBR. An MBR has no backup to restore from; DiskPilot treats MBR disks as display-only and USBDoctor
+- Formatting anything as a "repair". Format is a destination the user chooses (DiskPilot proper, a USBImager
+  burn, or USBDoctor's separate Prepare & Tools area), never a fix the repair tool proposes.
+- Writing an MBR as a repair. An MBR has no backup to restore from; DiskPilot treats MBR disks as display-only and USBDoctor
   inherits that rule. (The one MBR-area change allowed is #4: bringing a signature-collided disk online lets
   Windows rewrite the 4-byte disk signature, and USBDoctor discloses that first.)
 
@@ -335,7 +374,9 @@ Case: a letter-less stick that was never broken.
 - `Assert-WriteGate` refuses every writing repair on a drive with a dying signature.
 - It also refuses chkdsk and boot-sector repair after a failed timed raw read, `-Extend` on a recorded counterfeit,
   and a second `-ClearReadOnly`.
-- No format, initialize or clean code exists in USBDoctor. The GPT restore never touches sector 0.
+- No format, initialize or clean code exists in USBDoctor's repair engine (`USBDoctor.Core.psm1`). The GPT restore
+  never touches sector 0. Format, wipe and the bootable maker live only in Prepare & Tools (see above), behind
+  `ERASE <n>`, and are refused on dying, counterfeit and system disks.
 
 ## Output format per diagnosis
 

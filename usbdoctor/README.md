@@ -3,7 +3,9 @@
 A Windows companion to DiskPilot and USBImager for **diagnosing and safely repairing USB drives**. It follows
 the USB problem catalog ([../docs/USB-Problem-Catalog.md](../docs/USB-Problem-Catalog.md)): it diagnoses read-only first, works out who is at fault (the drive, the connection,
 this PC, or permissions), and offers only the repair that is safe for that state. It **refuses** to write to a
-drive that shows dying-media signatures, and it **never formats anything as a "repair"**.
+drive that shows dying-media signatures, and it **never formats anything as a "repair"**. Separate from the
+repairs, a clearly labelled **Prepare & Tools** area formats, wipes, makes bootable sticks, benchmarks, recovers
+files from images, watches drive health and maps USB ports (see [Prepare & Tools](#prepare--tools-not-repairs)).
 
 Plain Windows PowerShell 5.1 (a WinForms window plus a command line). Nothing to build or install.
 
@@ -77,7 +79,7 @@ USBDoctor can make the change itself, after a preview, the gate, and confirmatio
 | chkdsk or boot-sector repair on a drive whose raw first-sector read times out | Gate kinds `Chkdsk` and `BootSector` are refused unless the timed raw read completed. |
 | Capacity "repair" on a counterfeit | Gate kind `Extend` is refused when the history has a failed capacity test. |
 | Clearing read-only a second time after it returned on replug | `-ClearReadOnly` checks the history and refuses; the drive is marked DYING / copy-only. |
-| Formatting anything as a "repair" | No format, initialize, or clean code exists in USBDoctor. Empty or unreadable partitions point to USBImager / DiskPilot for a deliberate rebuild. |
+| Formatting anything as a "repair" | No format, initialize, or clean code exists in the repair engine (`USBDoctor.Core.psm1`), and no diagnosis ever suggests a format. Empty or unreadable partitions point to a Rescue image and USBImager / DiskPilot for a deliberate rebuild. Format, wipe and the bootable maker exist only in the separate Prepare & Tools area, as destinations you choose. |
 
 ## Fixes and the gate
 
@@ -121,19 +123,60 @@ reads, retries unreadable blocks in 4 KiB pieces, zero-fills what can't be read 
 same stick (model, serial, size) to come back and carries on. Stop it and run the same command again to resume.
 A completed image is recorded in the history, which unlocks gated repairs for that drive without the typed phrase.
 
+## Prepare & Tools (not repairs)
+
+Format, wipe and the bootable maker are **not repairs**. USBDoctor never proposes them as a fix for any problem in
+the catalog: its repairs never format and never write an MBR. These tools are destinations you choose. They live in
+a separate module (`USBDoctor.Tools.psm1`), behind their own switches and on their own window tab,
+**Prepare / Tools (not repairs)**, which carries a red warning. They build a brand-new partition table from scratch
+and erase the whole stick.
+
+Every erasing tool:
+
+- Works only on USB disks. The disks holding C:, D:, Windows, boot or the pagefile are refused, and so is
+  anything that isn't on the USB bus.
+- Refuses a drive with dying-media signatures ("image it, don't prepare it"), a drive recorded as counterfeit by
+  the capacity test, and a read-only drive.
+- Shows a plan first (`-PreviewOnly`, or the window's dialog). The plan says whether the stick holds files and
+  whether a Rescue image of it exists. If it holds files and has no image, you are offered a Rescue copy first.
+- Needs the typed phrase **`ERASE <disk>`**, re-checks the disk's identity just before writing, and logs
+  everything.
+
+| Tool | Switch | What it does | Erases |
+|---|---|---|---|
+| Format / prepare | `-Format -Disk N [-FileSystem exFAT\|NTFS\|FAT32] [-Label X] [-Letter Y] [-PartitionStyle Auto\|MBR\|GPT] [-SizeMB n]` | `diskpart clean`, a new partition table (Auto = MBR, or GPT above 2 TB), one primary partition starting at 1 MiB (aligned) and filling the disk (or `-SizeMB`), quick format, a letter. Defaults: exFAT, label `USB`. **FAT32 over 32 GB is refused** with a clear message: use exFAT or NTFS, or a smaller FAT32 partition with `-SizeMB 32000`. Labels are checked (FAT32/exFAT max 11 characters). | yes, `ERASE N` |
+| Wipe | `-Wipe -Disk N [-Passes Zero\|Random]` | Removes the partition table, then one pass of zeros or seeded pseudo-random data over every byte (64 MB slices, progress, ETA, Stop button). Verifies the first and last MiB and 64 random 1 MiB samples. Random mode zeroes the first MiB at the end so Windows sees a blank disk. | yes, `ERASE N` |
+| Bootable maker | `-MakeBootable -Iso file -Disk N [-Mode Auto\|Windows\|Raw] [-Sha256 hex] [-FileSystem FAT32\|NTFS] [-Label X]` | Computes the ISO's SHA-256 and refuses a mismatch with `-Sha256` before writing anything. **Raw** (hybrid ISOs with an MBR in sector 0, which covers most Linux installers): written byte-for-byte like `dd`, then read back and compared. **Windows** (detected by mounting the ISO read-only: `sources\boot.wim`, an install image, `bootmgr`/`efi\boot`): new MBR table, one active FAT32 partition (max 32000 MB), files copied, and `install.wim` over 4 GB split into `install.swm` parts with `dism /Split-Image`. `boot\bootsect.exe /nt60` is run from the ISO if present. Optional NTFS mode boots legacy BIOS only, because no UEFI:NTFS helper is added. ISOs that are neither are refused. | yes, `ERASE N` |
+| Benchmark | `-Benchmark -Letter X [-SizeMB 256]` / `-Benchmark -ReadOnly -Disk N [-SizeMB 256]` | **File mode** (no UAC): one temp file, unbuffered (`FILE_FLAG_NO_BUFFERING` + `WRITE_THROUGH`). It measures sequential write and read, then 4 KiB random write and read (8 s or 4000 operations each). Every 4 KiB block is verified. Free space is checked first and the temp file is always deleted. **-ReadOnly** (administrator): raw reads only, nothing written. Results go to the stick's history (last 20). A run more than 30% slower than the median of the last 5 runs in the same mode is flagged. Refused on dying drives; file mode is also refused on counterfeit sticks. | no (temp file only) |
+| Recover from an image | `-Recover -Image file.img [-OutDir dir] [-Carve] [-ToolsDir dir]` | Works on the **image file only**; the stick is never opened. Attaches the image **read-only**; if a file system needs its journal replayed before Windows will mount it (a stick pulled without Safely Remove), it re-attaches through a temporary overlay disk that takes the writes and is deleted afterwards, so the image is still never written. A raw `.img` gets a temporary 512-byte fixed-VHD footer exposed as a `.vhd` hard link, which is removed afterwards, and the image's length and contents are restored exactly. Readable files are copied with robocopy. `-Carve` runs PhotoRec (TestDisk suite) on the image for deleted or lost files, if PhotoRec is found in PATH, `-ToolsDir`, `C:\ProgramData\USBDoctor\tools`, Program Files or Downloads. If not, USBDoctor prints the download page (https://www.cgsecurity.org/wiki/TestDisk_Download). It **never downloads binaries**. | no |
+| Health watch | `-Watch Install\|Uninstall\|Status\|Run [-DryRun]` | Installs a scheduled task, *USBDoctor Health Watch*, that runs as you and **not elevated**: at logon and every 30 minutes, in a hidden window. Each pass reads the event logs for read errors, drop-outs and capacity changes per USB drive, stores them in `history.json`, and shows a notification when a drive's errors rise (3 or more new read errors, or new drops) or its verdict changes (OK, ERRORS or DYING). Notifications use a Windows toast, then BurntToast, then `msg.exe`. `-DryRun` computes and prints only. | no |
+| Port map | `-PortMap [-Html file]`, `-LabelPort 'front-left' (-Disk N \| -Port key)` | Tree of USB host controllers, root hubs, hubs, ports and devices, with errors and drops per port from the history. Ports with problems are marked. Text on the console, an HTML section in `-Report`, and a tree on the window's **Port map** tab. Your port labels are kept in `C:\ProgramData\USBDoctor\port-labels.json` (`-LabelPort -` removes one). | no |
+
+**Wipe and wear leveling.** USB flash controllers remap worn blocks internally. Old data in blocks the controller
+has retired can survive any overwrite, and no tool on the PC can reach them. A wipe is therefore **not guaranteed
+erasure**. For sensitive data, encrypt the stick from the start (BitLocker To Go). For a stick that held sensitive
+data unencrypted, destroy it physically.
+
 ## Files
 
 | File | Purpose |
 |---|---|
 | `USBDoctor.cmd` | Launcher (double-click); self-elevates through the UNC path |
 | `USBDoctor.ps1` | Window + command line |
-| `USBDoctor.Core.psm1` | All logic (inventory, diagnosis, Tier 0, gate, repairs, rescue, report) |
+| `USBDoctor.Core.psm1` | Diagnosis and repair logic (inventory, diagnosis, Tier 0, gate, repairs, rescue, report); no format code |
+| `USBDoctor.Tools.psm1` | Prepare & Tools (not repairs): format, wipe, bootable maker, benchmark, image recovery, health watch, port map |
 | `C:\ProgramData\USBDoctor\USBDoctor.log` | Log of every check and change |
-| `C:\ProgramData\USBDoctor\history.json` | Per-stick history: ports, errors/drops, raw reads, Tier 0 results, read-only clears, capacity tests, images |
+| `C:\ProgramData\USBDoctor\history.json` | Per-stick history: ports, errors/drops, raw reads, Tier 0 results, read-only clears, capacity tests, images, benchmarks, prepare actions, watch passes |
+| `C:\ProgramData\USBDoctor\port-labels.json` | Your names for USB ports (port map) |
 
 ## Known limitations
 
-- **Test status (2026-11-14):** USBDoctor's v2 repair paths are parse-checked and dry-run checked without admin rights. The earlier build passed 46 of 48 elevated tests against virtual disks (VHDs); the two failures were rescue stop/resume test-hook timing, since fixed. A final elevated test run of v2 is still pending, so treat the repairs as beta and try them on a disposable stick first.
+- **Test status (2026-11-14):** the 1.1.0 build (repairs plus Prepare & Tools) is parse-checked, import-checked and
+  dry-run checked without admin rights. The benchmark logic ran against a test folder, the image-wrap round trip
+  ran on a test file, and the plans (previews), refusals, port map, labels and a watch dry run ran against real
+  hardware read-only. The elevated test run against virtual disks (VHDs), which covers the v2 repairs and the new
+  format, wipe, bootable, raw benchmark and recovery paths, is **still pending**. Treat the repairs and the Prepare
+  tools as beta and try them on a disposable stick first.
 
 - Without administrator rights, the timed raw read (#3), boot-sector, GPT and ImageUSB checks are skipped. Dying
   detection then relies on the event log only.
@@ -143,6 +186,14 @@ A completed image is recorded in the history, which unlocks gated repairs for th
   hub instance.
 - The capacity test skips the first 1 MiB, but on a counterfeit stick, writes past the real flash wrap around and
   can land there anyway. That's why the test only runs on a blank stick with `ERASE N`.
+- Prepare & Tools: FAT32 above 32 GB is refused rather than formatted with a custom formatter. The Windows bootable
+  maker adds no UEFI:NTFS helper, so NTFS mode boots legacy BIOS only (FAT32 mode, the default, boots both).
+  Wipe can't guarantee erasure on flash (see above).
+- Recovery attaches images through Windows (administrator). PhotoRec can't read `.vhdx`; carve a raw `.img` instead.
+- The health watch task starts a hidden PowerShell window, which may flash briefly. Toast display depends on
+  Windows notification settings.
+- The port map takes 10-20 s (PnP property queries) and lists ports that have a device attached, plus labelled or
+  previously used ports that are empty now.
 - A hung raw read is abandoned, not killed. Windows may keep that thread until the stick is unplugged.
 - Bringing a signature-collision disk online lets Windows rewrite the 4-byte disk signature. That is the one
   MBR-area change USBDoctor allows (Windows makes it, and it's disclosed first).
