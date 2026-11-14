@@ -1,0 +1,37 @@
+# .NET build output
+bin/
+obj/
+dist/
+publish/
+out/
+*.user
+*.suo
+*.rsuser
+.vs/
+.vscode/
+.idea/
+TestResults/
+*.nupkg
+
+# Disk images and backups (never commit these)
+*.img
+*.bin
+*.iso
+*.vhd
+*.vhdx
+*.vhdx.json
+*.img.json
+
+# Logs
+*.log
+logs/
+robocopy-*.log
+
+# Archives
+*.zip
+*.7z
+
+# OS clutter
+Thumbs.db
+desktop.ini
+.DS_Store
