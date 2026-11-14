@@ -1,0 +1,420 @@
+﻿**********************
+Windows PowerShell transcript start
+Start time: 20261114132831
+Username: TESTPC\testuser
+RunAs User: TESTPC\testuser
+Configuration Name: 
+Machine: TESTPC (Microsoft Windows NT 10.0.26300.0)
+Host Application: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\ProgramData\USBDoctor\test\launch.ps1
+Process ID: 15412
+PSVersion: 5.1.26100.9711
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.9711
+BuildVersion: 10.0.26100.9711
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+AppDir=\\FILESERVER\Share\research\MyApps\Partition\USBDoctor
+=== A. Real drives (read-only)
+PASS  A1 -List (CLI, elevated)
+PASS  A2 -Diagnose -Disk 2 elevated (timed raw read, boot sector, access test; all read-only) : STATE: Healthy
+PASS  A3 timed raw read of disk 2 (64 KiB, read-only) : first 64 KiB read in 56 ms
+PASS  A4 H: partition identified (read-only) : Kind=NTFS PrimaryValid=True
+PS>TerminatingError(): "Disk 1 holds C:, D:, Windows, boot or the pagefile. USBDoctor never changes it."
+>> TerminatingError(): "Disk 1 holds C:, D:, Windows, boot or the pagefile. USBDoctor never changes it."
+>> TerminatingError(): "Disk 1 holds C:, D:, Windows, boot or the pagefile. USBDoctor never changes it."
+PASS  A5 refuse disk 1 (holds C:) (refused as expected: Disk 1 holds C:, D:, Windows, boot or the pagefile. USBDoctor never changes it.)
+PS>TerminatingError(): "Disk 0 holds C:, D:, Windows, boot or the pagefile. USBDoctor never changes it."
+>> TerminatingError(): "Disk 0 holds C:, D:, Windows, boot or the pagefile. USBDoctor never changes it."
+>> TerminatingError(): "Disk 0 holds C:, D:, Windows, boot or the pagefile. USBDoctor never changes it."
+PASS  A6 refuse disk 0 (holds D:) (refused as expected: Disk 0 holds C:, D:, Windows, boot or the pagefile. USBDoctor never changes it.)
+PS>TerminatingError(): "REFUSED: the capacity test erases the whole stick and only runs on a blank/empty one; H: holds 35 item(s), e.g. 'example-folder'. Copy the data off and empty it first."
+>> TerminatingError(): "REFUSED: the capacity test erases the whole stick and only runs on a blank/empty one; H: holds 35 item(s), e.g. 'example-folder'. Copy the data off and empty it first."
+PASS  A7 capacity test refused on H: (not blank) (refused as expected: REFUSED: the capacity test erases the whole stick and only runs on a blank/empty one; H: holds 35 item(s), e.g. 'example-folder'. Copy the data off and empty it first.)
+PS>TerminatingError(): "Disk 2 has no RAW partition to restore."
+>> TerminatingError(): "Disk 2 has no RAW partition to restore."
+PASS  A8 boot-sector restore refused on H: (no RAW partition) (refused as expected: Disk 2 has no RAW partition to restore.)
+PS>TerminatingError(): "Disk 2 does not have an ImageUSB-shifted MBR ('imageUSB' text in sector 0, 0x55AA at byte 1022 and not at 510). Nothing to fix."
+>> TerminatingError(): "Disk 2 does not have an ImageUSB-shifted MBR ('imageUSB' text in sector 0, 0x55AA at byte 1022 and not at 510). Nothing to fix."
+PASS  A9 ImageUSB fix refused on H: (not shifted) (refused as expected: Disk 2 does not have an ImageUSB-shifted MBR ('imageUSB' text in sector 0, 0x55AA at byte 1022 and not at 510). Nothing to fix.)
+PASS  A10 machine health (Tier 0) : WMI 139 ms, not sick
+PASS  A11 previews only: automount / suspend / ghosts : Automount is already on. Nothing to do. | USB selective suspend is already off (AC=0, DC=0). Nothing to do. | Remove these 3 device entries with 'pnputil /remove-device', then rescan (pnputil /scan-devices). Working devices come straight back; a stick that is plugged in is re-detected from scratch:
+PASS  A12 letter-in-use detection for Z: (mapped share) : a Network drive; mapped network drive \\FILESERVER\Share; network drive \\FILESERVER\Share
+PASS  A13 old disk-writing ImageUSB repair is gone : not present
+=== B. VHD1 (NTFS 128 of 256 MB, no letter)
+VHD1 is disk 3
+PS>TerminatingError(): "Disk 3 is a File Backed Virtual disk, not a USB drive. USBDoctor only changes USB drives."
+>> TerminatingError(): "Disk 3 is a File Backed Virtual disk, not a USB drive. USBDoctor only changes USB drives."
+>> TerminatingError(): "Disk 3 is a File Backed Virtual disk, not a USB drive. USBDoctor only changes USB drives."
+PASS  B0 virtual disk refused without -AllowVirtual (refused as expected: Disk 3 is a File Backed Virtual disk, not a USB drive. USBDoctor only changes USB drives.)
+PASS  B1 diagnose: NoLetter + Unallocated; State/Fault/Action/Change present : State=Needs attention: NoLetter | Fault=Windows configuration on this PC (letters/online state) - not the drive | Action=Assign a drive letter (persistent): -AssignLetter -Disk 3 -Letter X -Persistent (no image needed)
+free test letters: U,V,W,R,Q,P
+PS>TerminatingError(): "Drive letter H: is already in use by volume 'USBDATA' (NTFS) on disk 2. Pick another letter or free H: first. Nothing was changed."
+>> TerminatingError(): "Drive letter H: is already in use by volume 'USBDATA' (NTFS) on disk 2. Pick another letter or free H: first. Nothing was changed."
+PASS  B2 refuse letter H: (in use by USBDATA) (refused as expected: Drive letter H: is already in use by volume 'USBDATA' (NTFS) on disk 2. Pick another letter or free H: first. Nothing was changed.)
+PS>TerminatingError(): "Drive letter Z: is already in use by a Network drive; mapped network drive \\FILESERVER\Share; network drive \\FILESERVER\Share. Pick another letter or free Z: first. Nothing was changed."
+>> TerminatingError(): "Drive letter Z: is already in use by a Network drive; mapped network drive \\FILESERVER\Share; network drive \\FILESERVER\Share. Pick another letter or free Z: first. Nothing was changed."
+PASS  B3 refuse letter Z: (mapped network drive) (refused as expected: Drive letter Z: is already in use by a Network drive; mapped network drive \\FILESERVER\Share; network drive \\FILESERVER\Share. Pick another letter or free Z: first. Nothing was changed.)
+PS>TerminatingError(): "Drive letter W: is reserved by Windows for another drive that is not plugged in (USB drive Fake TestStick). Use -Force (or tick 'Release reservation' in the window) to take it over. Nothing was changed."
+>> TerminatingError(): "Drive letter W: is reserved by Windows for another drive that is not plugged in (USB drive Fake TestStick). Use -Force (or tick 'Release reservation' in the window) to take it over. Nothing was changed."
+PASS  B4 refuse W: reserved for absent stick (no -Force) (refused as expected: Drive letter W: is reserved by Windows for another drive that is not plugged in (USB drive Fake TestStick). Use -Force (or tick 'Release reservation' in the window) to take it over. Nothing was changed.)
+2026-11-14 13:34:03 [INFO] === Assign letter: disk 3 partition 1 (NTFS 'UDTEST') -> U:
+2026-11-14 13:34:05 [INFO] Letter U: assigned. Recorded for this drive in MountedDevices (MBR entry): \DosDevices\U: = MBR disk signature C0802F3C, partition at byte 65,536
+2026-11-14 13:34:05 [INFO] === Assign letter OK
+PASS  B5 assign U: persistent (#6, no image needed) : Disk       : 3 | Partition  : 1 | Letter     : U | Persistent : True | RecordKind : MBR | Record     : \DosDevices\U: = MBR disk signature C0802F3C, partition at byte 65,536
+2026-11-14 13:34:09 [INFO] === Assign letter: disk 3 partition 1 (NTFS 'UDTEST') -> W:
+2026-11-14 13:34:09 [WARN] Releasing stale reservation \DosDevices\W: = _??_USBSTOR#Disk&Ven_Fake&Prod_TestStick&Rev_1.00#0000TEST&0#{53f56307-b6bf-11d0-94f2-00a0c91efb8b} (old value hex 5F003F003F005F00550053004200530054004F00520023004400690073006B002600560065006E005F00460061006B0065002600500072006F0064005F00540065007300740053007400690063006B0026005200650076005F0031002E00300030002300300030003000300054004500530054002600300023007B00350033006600350036003300300037002D0062003600620066002D0031003100640030002D0039003400660032002D003000300061003000630039003100650066006200380062007D00)
+2026-11-14 13:34:11 [INFO] Letter W: assigned. Recorded for this drive in MountedDevices (MBR entry): \DosDevices\W: = MBR disk signature C0802F3C, partition at byte 65,536
+2026-11-14 13:34:11 [INFO] === Assign letter OK
+PASS  B6 take W: with -Force (releases reservation, shown first) : Disk       : 3 | Partition  : 1 | Letter     : W | Persistent : True | RecordKind : MBR | Record     : \DosDevices\W: = MBR disk signature C0802F3C, partition at byte 65,536
+PASS  B7 CLI assign back with -Confirm : Windows records the letter in HKLM\SYSTEM\MountedDevices keyed to this drive and gives it the same letter on every plug-in. USBDoctor checks that entry afterwards. 2026-11-14 13:34:38 [INFO] Letter U: assigned. Recorded for this drive in MountedDevices (MBR entry): \DosDevices\U: = MBR disk signature C0802F3C, partition at byte 65,536 2026-11-14 13:34:38 [INFO] === Assign letter OK Letter     : U Persistent : True
+PASS  B8 diagnose finds Dirty (#10) : Dirty found
+PS>TerminatingError(): "No complete Rescue image of disk 3 exists. Make one first (-Rescue -Disk 3) or accept the risk by typing REPAIR 3."
+>> TerminatingError(): "No complete Rescue image of disk 3 exists. Make one first (-Rescue -Disk 3) or accept the risk by typing REPAIR 3."
+>> TerminatingError(): "No complete Rescue image of disk 3 exists. Make one first (-Rescue -Disk 3) or accept the risk by typing REPAIR 3."
+PASS  B9 chkdsk refused: no image, no phrase (refused as expected: No complete Rescue image of disk 3 exists. Make one first (-Rescue -Disk 3) or accept the risk by typing REPAIR 3.)
+2026-11-14 13:34:51 [WARN] Gate Chkdsk: no image; risk accepted with typed phrase.
+2026-11-14 13:34:51 [INFO] === chkdsk U: /f /x
+2026-11-14 13:34:51 [INFO] chkdsk: 0 unindexed files scanned.
+2026-11-14 13:34:51 [INFO] chkdsk: Phase duration (Orphan reconnection): 0.04 milliseconds.
+2026-11-14 13:34:51 [INFO] chkdsk: 0 unindexed files recovered to lost and found.
+2026-11-14 13:34:51 [INFO] chkdsk: Phase duration (Orphan recovery to lost and found): 0.18 milliseconds.
+2026-11-14 13:34:51 [INFO] chkdsk: 0 reparse records processed.
+2026-11-14 13:34:51 [INFO] chkdsk: 0 reparse records processed.
+2026-11-14 13:34:51 [INFO] chkdsk: Phase duration (Reparse point and Object ID verification): 0.08 milliseconds.
+2026-11-14 13:34:51 [INFO] chkdsk: Stage 3: Examining security descriptors ...
+2026-11-14 13:34:51 [INFO] chkdsk: Security descriptor verification completed.
+2026-11-14 13:34:51 [INFO] chkdsk: Phase duration (Security descriptor verification): 0.70 milliseconds.
+2026-11-14 13:34:51 [INFO] chkdsk: 11 data files processed.
+2026-11-14 13:34:51 [INFO] chkdsk: Phase duration (Data attribute verification): 0.02 milliseconds.
+2026-11-14 13:34:51 [INFO] chkdsk: Windows has scanned the file system and found no problems.
+2026-11-14 13:34:51 [INFO] chkdsk: No further action is required.
+2026-11-14 13:34:51 [INFO] chkdsk: 131071 KB total disk space.
+2026-11-14 13:34:51 [INFO] chkdsk: 5184 KB in 7 files.
+2026-11-14 13:34:51 [INFO] chkdsk: 72 KB in 13 indexes.
+2026-11-14 13:34:51 [INFO] chkdsk: 0 KB in bad sectors.
+2026-11-14 13:34:51 [INFO] chkdsk: 2719 KB in use by the system.
+2026-11-14 13:34:51 [INFO] chkdsk: 2048 KB occupied by the log file.
+2026-11-14 13:34:51 [INFO] chkdsk: 123096 KB available on disk.
+2026-11-14 13:34:51 [INFO] chkdsk: 4096 bytes in each allocation unit.
+2026-11-14 13:34:51 [INFO] chkdsk: 32767 total allocation units on disk.
+2026-11-14 13:34:51 [INFO] chkdsk: 30774 allocation units available on disk.
+2026-11-14 13:34:51 [INFO] chkdsk: Total duration: 6.16 milliseconds (6 ms).
+2026-11-14 13:34:51 [INFO] chkdsk finished: no errors found.
+PASS  B10 chkdsk with typed REPAIR N (risk accepted) : Letter ExitCode Result          ImageOnFile | ------ -------- ------          ----------- | U             0 no errors found       False
+PASS  B11 dirty bit cleared
+PASS  B12 diagnose finds ReadOnly (#8) : ReadOnly found
+2026-11-14 13:35:00 [WARN] Gate ClearReadOnly: no image; risk accepted with typed phrase.
+2026-11-14 13:35:00 [INFO] === Clear read-only on disk 3
+2026-11-14 13:35:04 [INFO] Read-only cleared on disk 3; test write on U: OK.
+PASS  B13 clear read-only (REPAIR N) + test write + recorded : test write on U: OK; clears on file: 1
+PASS  B14 read-only returned -> DYING, copy-only : State=DYING - image what you can, do not repair (ReadOnlyReturned) | Refused: Every write repair is refused on this drive (it disconnected or timed out during read-only diagnosis). / Clearing read-only a second time is refused: it came back after a replug. / Formatting is never offered as a repair.
+PS>TerminatingError(): "REFUSED on disk 3: dying - image what you can, do not repair (ReadOnlyReturned). USBDoctor never runs a write repair on a drive that disconnects or times out during read-only diagnosis."
+>> TerminatingError(): "REFUSED on disk 3: dying - image what you can, do not repair (ReadOnlyReturned). USBDoctor never runs a write repair on a drive that disconnects or times out during read-only diagnosis."
+>> TerminatingError(): "REFUSED on disk 3: dying - image what you can, do not repair (ReadOnlyReturned). USBDoctor never runs a write repair on a drive that disconnects or times out during read-only diagnosis."
+PASS  B15 second read-only clear refused (refused as expected: REFUSED on disk 3: dying - image what you can, do not repair (ReadOnlyReturned). USBDoctor never runs a write repair on a drive that disconnects or times out during read-only diagnosis.)
+PS>TerminatingError(): "REFUSED on disk 3: dying - image what you can, do not repair (ReadOnlyReturned). USBDoctor never runs a write repair on a drive that disconnects or times out during read-only diagnosis."
+>> TerminatingError(): "REFUSED on disk 3: dying - image what you can, do not repair (ReadOnlyReturned). USBDoctor never runs a write repair on a drive that disconnects or times out during read-only diagnosis."
+>> TerminatingError(): "REFUSED on disk 3: dying - image what you can, do not repair (ReadOnlyReturned). USBDoctor never runs a write repair on a drive that disconnects or times out during read-only diagnosis."
+PASS  B16 chkdsk also refused on the dying drive (refused as expected: REFUSED on disk 3: dying - image what you can, do not repair (ReadOnlyReturned). USBDoctor never runs a write repair on a drive that disconnects or times out during read-only diagnosis.)
+PASS  B17 diagnose finds Offline (#4) : Offline found
+2026-11-14 13:37:06 [WARN] Gate Online: no image; risk accepted with typed phrase.
+2026-11-14 13:37:06 [INFO] === Online disk 3 (collision: False)
+2026-11-14 13:37:07 [INFO] Disk 3 is online.
+PASS  B18 online preview shows gate, then online (REPAIR N) : destructive=True online=True
+PS>TerminatingError(): "No complete Rescue image of disk 3 exists. Make one first (-Rescue -Disk 3) or accept the risk by typing REPAIR 3."
+>> TerminatingError(): "No complete Rescue image of disk 3 exists. Make one first (-Rescue -Disk 3) or accept the risk by typing REPAIR 3."
+>> TerminatingError(): "No complete Rescue image of disk 3 exists. Make one first (-Rescue -Disk 3) or accept the risk by typing REPAIR 3."
+PASS  B19 extend refused: no image, wrong phrase (refused as expected: No complete Rescue image of disk 3 exists. Make one first (-Rescue -Disk 3) or accept the risk by typing REPAIR 3.)
+2026-11-14 13:37:29 [INFO] === Rescue copy: disk 3 Msft Virtual Disk serial '' 256.0 MB -> C:\ProgramData\USBDoctor\test\rescue-vhd1.img
+2026-11-14 13:37:29 [INFO] Read-only: nothing is written to the drive. Unreadable areas are skipped and zero-filled. If it drops out, unplug and replug it; the copy resumes.
+2026-11-14 13:37:29 [WARN] Stopped after 52428800 bytes (test switch); progress saved.
+PASS  B20 rescue run 1 (2 simulated bad ranges, stop after 50 MB) : Image     : C:\ProgramData\USBDoctor\test\rescue-vhd1.img | Status    : stopped | Size      : 268435456 | Position  : 52428800 | BytesBad  : 12288 | BadRanges : 2 | DropOuts  : 0 | Map       : C:\ProgramData\USBDoctor\test\rescue-vhd1.img.rescue.json
+2026-11-14 13:37:33 [INFO] Resuming rescue of Msft Virtual Disk at 50.0 MB of 256.0 MB (12 KB unreadable so far).
+2026-11-14 13:37:44 [INFO] === Rescue copy: disk 3 Msft Virtual Disk serial '' 256.0 MB -> C:\ProgramData\USBDoctor\test\rescue-vhd1.img
+2026-11-14 13:37:44 [INFO] Read-only: nothing is written to the drive. Unreadable areas are skipped and zero-filled. If it drops out, unplug and replug it; the copy resumes.
+2026-11-14 13:37:44 [INFO] Rescue: 58.6% (150.0 MB of 256.0 MB), 100.0 MB/s, unreadable 12 KB in 2 range(s)
+2026-11-14 13:37:44 [WARN] The drive stopped answering at 157,286,400 bytes (Win32 error 1167). Progress saved. Unplug it and plug it back in; waiting up to 2 min.
+2026-11-14 13:37:45 [INFO] Drive is back as disk 3. Resuming at 150.0 MB.
+2026-11-14 13:37:47 [INFO] Rescue: 100.0% (256.0 MB of 256.0 MB), 103.0 MB/s, unreadable 12 KB in 2 range(s)
+2026-11-14 13:37:47 [INFO] === Rescue complete: C:\ProgramData\USBDoctor\test\rescue-vhd1.img. Unreadable: 12 KB in 2 range(s) (listed in C:\ProgramData\USBDoctor\test\rescue-vhd1.img.badranges.txt).
+2026-11-14 13:37:47 [INFO] Image recorded in the device history (VIRTUAL|60022480D5D02921912C74AB60EBEF9C); gated repairs no longer need the typed risk phrase.
+PASS  B21 rescue resume with simulated drop-out at 150 MB : Image     : C:\ProgramData\USBDoctor\test\rescue-vhd1.img | Status    : done | Size      : 268435456 | Position  : 268435456 | BytesBad  : 12288 | BadRanges : 2 | DropOuts  : 1 | Map       : C:\ProgramData\USBDoctor\test\rescue-vhd1.img.rescue.json
+PASS  B22 rescue image == disk except zero-filled bad ranges : SHA256 match 45B0341FFF3379C280DC7CC1DC1202E74ED6E13E34B0BB80146319F130F5D953
+PASS  B23 completed image recorded in history : VIRTUAL|60022480D5D02921912C74AB60EBEF9C -> C:\ProgramData\USBDoctor\test\rescue-vhd1.img
+2026-11-14 13:37:57 [INFO] Gate Extend: image on file C:\ProgramData\USBDoctor\test\rescue-vhd1.img (2026-11-14T13:37:47).
+2026-11-14 13:37:57 [INFO] === Extend disk 3 partition 1 NTFS to 267321344 bytes
+2026-11-14 13:37:57 [INFO] Partition is now 254.9 MB; volume 254.9 MB.
+2026-11-14 13:37:57 [INFO] === Extend OK
+PASS  B24 extend WITHOUT phrase now allowed (image on file) : Disk Partition   NewSize VolumeSize | ---- ---------   ------- ---------- | 3         1 267321344  267317248
+PASS  B25 file still readable after extend
+PASS  B26 simulated raw-read timeout -> DYING, image only, provisional Tier 0 prompt : State=DYING - image what you can, do not repair (RawReadTimeout) | Fault=Drive (provisional - not yet tried on another port or PC) | Action=Rescue copy now (image with skip-on-error and resume): -Rescue -Disk 3
+PS>TerminatingError(): "REFUSED on disk 3: dying - image what you can, do not repair (RawReadTimeout). USBDoctor never runs a write repair on a drive that disconnects or times out during read-only diagnosis."
+>> TerminatingError(): "REFUSED on disk 3: dying - image what you can, do not repair (RawReadTimeout). USBDoctor never runs a write repair on a drive that disconnects or times out during read-only diagnosis."
+>> TerminatingError(): "REFUSED on disk 3: dying - image what you can, do not repair (RawReadTimeout). USBDoctor never runs a write repair on a drive that disconnects or times out during read-only diagnosis."
+PASS  B27 chkdsk refused while raw read times out (even with phrase + image) (refused as expected: REFUSED on disk 3: dying - image what you can, do not repair (RawReadTimeout). USBDoctor never runs a write repair on a drive that disconnects or times out during read-only diagnosis.)
+PASS  B28 CLI chkdsk refused with simulated timeout : exit 1, refused
+2026-11-14 13:38:26 [INFO] Tier 0 result recorded for VIRTUAL|60022480D5D02921912C74AB60EBEF9C: OtherPortFails test
+PASS  B29 Tier 0 recorded: other port fails -> fault owner confirmed Drive : Drive (confirmed: OtherPortFails)
+PASS  B30 rescue CLI path (-Rescue -WaitForModel, fresh file) : Status    : done BytesBad  : 0
+PASS  B31 zeroed NTFS boot sector -> BootSectorDamaged, backup found : Partition 1: the NTFS boot sector is damaged, but its backup copy is intact (#5). It can be restored from the backup (image first).
+2026-11-14 13:38:58 [INFO] Gate BootSector: image on file C:\ProgramData\USBDoctor\test\rescue-cli.img (2026-11-14T13:38:37).
+2026-11-14 13:38:58 [INFO] === Restore NTFS boot sector: disk 3 partition 1 from byte 267386368
+2026-11-14 13:38:58 [INFO] Saved the damaged sectors to D:\USB-Backups\USBDoctor-Backups\disk3-part1-bootsector-before-restore-20261114-133858.bin.
+2026-11-14 13:39:01 [INFO] Lock volume \\.\U:: locked=True, dismounted=True
+2026-11-14 13:39:08 [INFO] After restore: partition 1 file system = NTFS.
+PASS  B32 restore boot sector from backup (image on file, no phrase) : Disk            : 3 | Partition       : 1 | Kind            : NTFS | FileSystemNow   : NTFS | SavedOldSectors : D:\USB-Backups\USBDoctor-Backups\disk3-part1-bootsector-before-restore-20261114-133858.bin | ImageOnFile     : True
+PASS  B33 file readable after boot-sector restore
+=== C. VHD2 (FAT32 128 of 200 MB)
+VHD2 is disk 4 letter F
+PASS  C1 diagnose finds FatCantGrow (#13 truncated partition) : codes: Alignment,FatCantGrow
+PS>TerminatingError(): "Partition 1 is FAT32; Windows can't enlarge FAT. Convert it to NTFS first (Convert to NTFS), then extend."
+>> TerminatingError(): "Partition 1 is FAT32; Windows can't enlarge FAT. Convert it to NTFS first (Convert to NTFS), then extend."
+PASS  C2 extend refused on FAT32 (refused as expected: Partition 1 is FAT32; Windows can't enlarge FAT. Convert it to NTFS first (Convert to NTFS), then extend.)
+2026-11-14 13:41:04 [WARN] Gate Convert: no image; risk accepted with typed phrase.
+2026-11-14 13:41:04 [INFO] === Convert F: FAT32 -> NTFS
+2026-11-14 13:41:05 [INFO] convert: 1,024 bytes in 1 hidden files.
+2026-11-14 13:41:05 [INFO] convert: 2,048 bytes in 2 files.
+2026-11-14 13:41:05 [INFO] convert: 130,019,328 bytes available on disk.
+2026-11-14 13:41:05 [INFO] convert: 1,024 bytes in each allocation unit.
+2026-11-14 13:41:05 [INFO] convert: 126,976 total allocation units on disk.
+2026-11-14 13:41:05 [INFO] convert: 126,972 allocation units available on disk.
+2026-11-14 13:41:05 [INFO] convert: Determining disk space required for file system conversion...
+2026-11-14 13:41:05 [INFO] convert: Total disk space:                131072 KB
+2026-11-14 13:41:05 [INFO] convert: Free space on volume:            126972 KB
+2026-11-14 13:41:05 [INFO] convert: Space required for conversion:     2928 KB
+2026-11-14 13:41:05 [INFO] convert: Converting file system
+2026-11-14 13:41:05 [INFO] convert: Conversion complete
+2026-11-14 13:41:07 [INFO] === Convert OK
+PASS  C3 convert FAT32 -> NTFS (REPAIR N) : Letter FileSystem ExitCode | ------ ---------- -------- | F      NTFS              0
+PASS  C4 file kept after convert
+PASS  C5 CLI -Extend with -ConfirmPhrase : NewSize    : 208601088 VolumeSize : 208600064
+2026-11-14 13:41:22 [INFO] === Safe eject disk 4 Msft Virtual Disk
+2026-11-14 13:41:23 [INFO] Virtual disk 4 detached.
+PASS  C6 safe eject (virtual: detach) : Disk Ejected | ---- ------- | 4    True
+=== D. VHD3 (ImageUSB-shifted MBR)
+VHD3 re-attached shifted as disk 4, style RAW; original data SHA256 9AB0FBBC021755F6916EA8A7737E11AED5329BD34C8EAF02FD99B91FE1C02271
+PASS  D1 diagnose finds ImageUsbShift : codes: ImageUsbShift; action: Image + strip the ImageUSB header + burn with USBImager: -FixImageUsbShift -Disk 4 -Out <file>.img (the stick is only read)
+PASS  D2 CLI -FixImageUsbShift -Disk N: rescue image + strip header : FixedImage   : C:\ProgramData\USBDoctor\test\shift-clean.img StickWritten : False BurnCommand  : \\FILESERVER\Share\research\MyApps\Partition\USBImager\USBImager.cmd -Burn -Image "C:\ProgramData\USBDoctor\test\shift-clean.img" -Disk <N>
+PASS  D3 stick untouched (VHD file hash identical, still RAW) : style RAW, hash unchanged
+PASS  D4 clean image = original unshifted disk data (MBR at 0) : SHA256 match 9AB0FBBC021755F6916EA8A7737E11AED5329BD34C8EAF02FD99B91FE1C02271, 67108352 bytes
+PASS  D5 file-only CLI -FixImageUsbShift -Image (no disk access) : same clean image
+PS>TerminatingError(): "C:\ProgramData\USBDoctor\test\shift-clean.img does not start with a 512-byte imageUSB header followed by an MBR (0x55AA at byte 1022). Nothing to strip."
+>> TerminatingError(): "C:\ProgramData\USBDoctor\test\shift-clean.img does not start with a 512-byte imageUSB header followed by an MBR (0x55AA at byte 1022). Nothing to strip."
+PASS  D6 stripping a clean image refused (refused as expected: C:\ProgramData\USBDoctor\test\shift-clean.img does not start with a 512-byte imageUSB header followed by an MBR (0x55AA at byte 1022). Nothing to strip.)
+PASS  D7 -Report with virtual disks : USBDoctor-20261114-090923.html, USBDoctor-20261114-090923.txt, USBDoctor-20261114-130039.html, USBDoctor-20261114-130039.txt, USBDoctor-20261114-134628.html, USBDoctor-20261114-134628.txt
+=== E. VHD4 (GPT, primary header destroyed)
+E0 in-place zero of LBA 1: header right after the write reads '........', after Windows re-reads the disk 'EFI PART' ('EFI PART' = Windows rewrote it)
+E file patch (rw attach): file primary header '........', file backup header 'EFI PART'; after attach disk 5 LBA 1 reads 'EFI PART'
+NOTE E: Windows rewrote the primary GPT from the backup by itself when the damaged disk was attached writable. Detection and refusal are tested on a read-only attach; the restore write (E4/E5) cannot be exercised on this Windows build.
+E file patch (ro attach): file primary header '........', file backup header 'EFI PART'; after attach disk 5 LBA 1 reads '........'
+PASS  E1 GPT check: primary invalid, backup valid, protective MBR present : primary=bad backup=ok pmbr=ok
+PASS  E2 diagnose finds GptPrimaryDamaged : codes: ReadOnly,GptPrimaryDamaged,Alignment,Unallocated
+PS>TerminatingError(): "No complete Rescue image of disk 5 exists. Make one first (-Rescue -Disk 5) or accept the risk by typing REPAIR 5."
+>> TerminatingError(): "No complete Rescue image of disk 5 exists. Make one first (-Rescue -Disk 5) or accept the risk by typing REPAIR 5."
+>> TerminatingError(): "No complete Rescue image of disk 5 exists. Make one first (-Rescue -Disk 5) or accept the risk by typing REPAIR 5."
+PASS  E3 GPT restore refused without image/phrase (refused as expected: No complete Rescue image of disk 5 exists. Make one first (-Rescue -Disk 5) or accept the risk by typing REPAIR 5.)
+SKIP  E4/E5 GPT restore write: Windows repairs the primary GPT itself on a writable attach (see NOTE E)
+=== F. VHD5 (Linux partition id=83 + ext magic), VHD6 (blank) capacity test
+PASS  F1 ext partition -> ForeignFs, healthy drive wrong OS, no repair : State=Healthy drive, wrong OS (file system Windows cannot read) | Fault=None - healthy drive, wrong OS / locked (formatted for another system)
+PS>TerminatingError(): "Partition 1 holds Linux ext2/ext3/ext4 - healthy, just another OS. Nothing to restore."
+>> TerminatingError(): "Partition 1 holds Linux ext2/ext3/ext4 - healthy, just another OS. Nothing to restore."
+PASS  F2 boot-sector restore refused on foreign FS (refused as expected: Partition 1 holds Linux ext2/ext3/ext4 - healthy, just another OS. Nothing to restore.)
+PS>TerminatingError(): "REFUSED: the capacity test erases the whole stick and only runs on a blank/empty one; partition 1 is RAW, so USBDoctor can't tell whether it holds data. Copy the data off and empty it first."
+>> TerminatingError(): "REFUSED: the capacity test erases the whole stick and only runs on a blank/empty one; partition 1 is RAW, so USBDoctor can't tell whether it holds data. Copy the data off and empty it first."
+PASS  F3 capacity test refused (RAW partition, contents unknown) (refused as expected: REFUSED: the capacity test erases the whole stick and only runs on a blank/empty one; partition 1 is RAW, so USBDoctor can't tell whether it holds data. Copy the data off and empty it first.)
+PS>TerminatingError(): "Not confirmed: type ERASE 7 exactly. Nothing was written."
+>> TerminatingError(): "Not confirmed: type ERASE 7 exactly. Nothing was written."
+PASS  F4 capacity test refused with wrong phrase (refused as expected: Not confirmed: type ERASE 7 exactly. Nothing was written.)
+2026-11-14 13:54:48 [INFO] === Capacity test disk 7 Msft Virtual Disk claimed 67108864 bytes, 63 blocks
+2026-11-14 13:54:53 [INFO] Capacity test PASSED: all 63 blocks verified. The stick really stores 64.0 MB.
+PASS  F5 capacity test on blank genuine VHD -> Genuine : 63 blocks OK
+PASS  F6 CLI capacity test with simulated wrap at 32 MB -> Counterfeit : BadBlocks      : 31 GoodBytes      : 34603008 Verdict        : COUNTERFEIT: only about 33.0 MB of the claimed 64.0 MB stores data. Condemned; capacity 'repair' is impossible.
+PASS  F7 diagnose: COUNTERFEIT condemned, capacity repair refused : State=COUNTERFEIT capacity - condemned | gate: this stick failed the capacity test (counterfeit). Its real size is about 33.0 MB; 'repairing' capacity is impossible.
+PASS  F8 no format anywhere: no exported command formats : none
+=== G. Prepare & Tools (VHDs only)
+PASS  G0 erase code only in the Prepare commands; Core still has none (F8) : erase code in: Clear-UsbDrive, Format-UsbDrive
+PS>TerminatingError(): "REFUSED on disk 7: this stick failed the capacity test (counterfeit; real size about 33.0 MB of 64.0 MB). Formatting would put data on flash that isn't there. Condemn it."
+>> TerminatingError(): "REFUSED on disk 7: this stick failed the capacity test (counterfeit; real size about 33.0 MB of 64.0 MB). Formatting would put data on flash that isn't there. Condemn it."
+>> TerminatingError(): "REFUSED on disk 7: this stick failed the capacity test (counterfeit; real size about 33.0 MB of 64.0 MB). Formatting would put data on flash that isn't there. Condemn it."
+PASS  G1 format refused on the counterfeit VHD (F6 record) (refused as expected: REFUSED on disk 7: this stick failed the capacity test (counterfeit; real size about 33.0 MB of 64.0 MB). Formatting would put data on flash that isn't there. Condemn it.)
+PS>TerminatingError(): "REFUSED on disk 7: this stick failed the capacity test (counterfeit; real size about 33.0 MB of 64.0 MB). Wiping would put data on flash that isn't there. Condemn it."
+>> TerminatingError(): "REFUSED on disk 7: this stick failed the capacity test (counterfeit; real size about 33.0 MB of 64.0 MB). Wiping would put data on flash that isn't there. Condemn it."
+>> TerminatingError(): "REFUSED on disk 7: this stick failed the capacity test (counterfeit; real size about 33.0 MB of 64.0 MB). Wiping would put data on flash that isn't there. Condemn it."
+PASS  G2 wipe refused on the counterfeit VHD too (refused as expected: REFUSED on disk 7: this stick failed the capacity test (counterfeit; real size about 33.0 MB of 64.0 MB). Wiping would put data on flash that isn't there. Condemn it.)
+PS>TerminatingError(): "Disk 1 holds C:, D:, Windows, boot or the pagefile. USBDoctor never changes it."
+>> TerminatingError(): "Disk 1 holds C:, D:, Windows, boot or the pagefile. USBDoctor never changes it."
+>> TerminatingError(): "Disk 1 holds C:, D:, Windows, boot or the pagefile. USBDoctor never changes it."
+>> TerminatingError(): "Disk 1 holds C:, D:, Windows, boot or the pagefile. USBDoctor never changes it."
+PASS  G3 format refused on disk 1 (holds C:) (refused as expected: Disk 1 holds C:, D:, Windows, boot or the pagefile. USBDoctor never changes it.)
+PS>TerminatingError(): "Disk 0 holds C:, D:, Windows, boot or the pagefile. USBDoctor never changes it."
+>> TerminatingError(): "Disk 0 holds C:, D:, Windows, boot or the pagefile. USBDoctor never changes it."
+>> TerminatingError(): "Disk 0 holds C:, D:, Windows, boot or the pagefile. USBDoctor never changes it."
+>> TerminatingError(): "Disk 0 holds C:, D:, Windows, boot or the pagefile. USBDoctor never changes it."
+PASS  G4 wipe refused on disk 0 (holds D:) (refused as expected: Disk 0 holds C:, D:, Windows, boot or the pagefile. USBDoctor never changes it.)
+VHD7 (prepare target, 96 MB blank) is disk 8
+prepare letter: V
+PS>TerminatingError(): "Not confirmed: type ERASE 8 exactly. Nothing was written."
+>> TerminatingError(): "Not confirmed: type ERASE 8 exactly. Nothing was written."
+>> TerminatingError(): "Not confirmed: type ERASE 8 exactly. Nothing was written."
+PASS  G5 format refused with wrong phrase (refused as expected: Not confirmed: type ERASE 8 exactly. Nothing was written.)
+PS>TerminatingError(): "FAT32 labels are at most 11 characters ('WAY_TOO_LONG_LABEL' has 18)."
+>> TerminatingError(): "FAT32 labels are at most 11 characters ('WAY_TOO_LONG_LABEL' has 18)."
+>> TerminatingError(): "FAT32 labels are at most 11 characters ('WAY_TOO_LONG_LABEL' has 18)."
+PASS  G6 FAT32 label rule (refused as expected: FAT32 labels are at most 11 characters ('WAY_TOO_LONG_LABEL' has 18).)
+PS>TerminatingError(): "REFUSED on disk 8: Formatting is not done on a drive that is dying - image what you can, do not repair (RawReadTimeout). USBDoctor never runs a write repair on a drive that disconnects or times out during read-only diagnosis."
+>> TerminatingError(): "REFUSED on disk 8: Formatting is not done on a drive that is dying - image what you can, do not repair (RawReadTimeout). USBDoctor never runs a write repair on a drive that disconnects or times out during read-only diagnosis."
+>> TerminatingError(): "REFUSED on disk 8: Formatting is not done on a drive that is dying - image what you can, do not repair (RawReadTimeout). USBDoctor never runs a write repair on a drive that disconnects or times out during read-only diagnosis."
+PASS  G7 format refused on a dying drive (simulated raw-read timeout) (refused as expected: REFUSED on disk 8: Formatting is not done on a drive that is dying - image what you can, do not repair (RawReadTimeout). USBDoctor never runs a write repair on a drive that disconnects or times out during read-only diagnosis.)
+PS>TerminatingError(): "REFUSED on disk 8: Making a bootable stick is not done on a drive that is dying - image what you can, do not repair (RawReadTimeout). USBDoctor never runs a write repair on a drive that disconnects or times out during read-only diagnosis."
+>> TerminatingError(): "REFUSED on disk 8: Making a bootable stick is not done on a drive that is dying - image what you can, do not repair (RawReadTimeout). USBDoctor never runs a write repair on a drive that disconnects or times out during read-only diagnosis."
+>> TerminatingError(): "REFUSED on disk 8: Making a bootable stick is not done on a drive that is dying - image what you can, do not repair (RawReadTimeout). USBDoctor never runs a write repair on a drive that disconnects or times out during read-only diagnosis."
+PASS  G8 bootable refused on a dying drive (refused as expected: REFUSED on disk 8: Making a bootable stick is not done on a drive that is dying - image what you can, do not repair (RawReadTimeout). USBDoctor never runs a write repair on a drive that disconnects or times out during read-only diagnosis.)
+2026-11-14 14:00:41 [INFO] === PREPARE format disk 8 Msft Virtual Disk: MBR, NTFS 'UDNTFS', 95.0 MB
+2026-11-14 14:04:23 [INFO] diskpart:     0 percent completed |   100 percent completed | DiskPart successfully formatted the volume. | DiskPart successfully assigned the drive letter or mount point.
+2026-11-14 14:04:23 [INFO] diskpart: the disk was already online (harmless).
+2026-11-14 14:04:49 [INFO] === Format OK: V: NTFS 'UDNTFS' 94.0 MB
+PASS  G9 format NTFS / MBR with -Letter V: : V: NTFS 'UDNTFS' 98562048 bytes, offset 1 MiB
+PASS  G10 preview on a stick with files says it holds data (Rescue offered) : HasFiles=True Phrase=ERASE 8
+PASS  G11 CLI -Format -PreviewOnly (no change) : plan printed, file still there
+2026-11-14 14:05:20 [INFO] === PREPARE format disk 8 Msft Virtual Disk: GPT, exFAT 'UDEXFAT', 94.0 MB
+2026-11-14 14:06:40 [INFO] diskpart:     0 percent completed |   100 percent completed | DiskPart successfully formatted the volume. | DiskPart successfully assigned the drive letter or mount point.
+2026-11-14 14:06:40 [INFO] diskpart: the disk was already online (harmless).
+2026-11-14 14:06:43 [INFO] === Format OK: I: exFAT 'UDEXFAT' 93.8 MB
+PASS  G12 format exFAT / GPT : I: exFAT GPT, data partition at 1048576
+2026-11-14 14:06:53 [INFO] === PREPARE format disk 8 Msft Virtual Disk: MBR, FAT32 'UDFAT', 95.0 MB
+2026-11-14 14:08:15 [INFO] diskpart:     0 percent completed |   100 percent completed | DiskPart successfully formatted the volume. | DiskPart successfully assigned the drive letter or mount point.
+2026-11-14 14:08:15 [INFO] diskpart: the disk was already online (harmless).
+2026-11-14 14:08:16 [INFO] === Format OK: I: FAT32 'UDFAT' 90.0 MB
+PASS  G13 format FAT32 / MBR (Auto style) : I: FAT32 MBR 94371840 bytes
+PS>TerminatingError(): "REFUSED: Windows formats FAT32 only up to 32 GB and this partition would be 40.00 GB. Use exFAT (Windows, macOS, most TVs, cars and cameras) or NTFS, or make a smaller FAT32 partition with -SizeMB 32000 (the rest stays unallocated). USBDoctor deliberately does not ship its own large-FAT32 formatter."
+>> TerminatingError(): "REFUSED: Windows formats FAT32 only up to 32 GB and this partition would be 40.00 GB. Use exFAT (Windows, macOS, most TVs, cars and cameras) or NTFS, or make a smaller FAT32 partition with -SizeMB 32000 (the rest stays unallocated). USBDoctor deliberately does not ship its own large-FAT32 formatter."
+PASS  G14 FAT32 on a 40 GB disk refused with a clear message (refused as expected: REFUSED: Windows formats FAT32 only up to 32 GB and this partition would be 40.00 GB. Use exFAT (Windows, macOS, most TVs, cars and cameras) or NTFS, or make a smaller FAT32 partition with -SizeMB 32000 (the rest stays unallocated). USBDoctor deliberately does not ship its own large-FAT32 formatter.)
+PASS  G15 FAT32 with -SizeMB 32000 on the 40 GB disk: plan OK : plan OK
+PASS  G16 exFAT on the 40 GB disk: plan OK (MBR auto)
+PS>TerminatingError(): "Not confirmed: type ERASE 8 exactly. Nothing was written."
+>> TerminatingError(): "Not confirmed: type ERASE 8 exactly. Nothing was written."
+>> TerminatingError(): "Not confirmed: type ERASE 8 exactly. Nothing was written."
+PASS  G17 wipe refused with wrong phrase (refused as expected: Not confirmed: type ERASE 8 exactly. Nothing was written.)
+2026-11-14 14:10:24 [INFO] === PREPARE wipe disk 8 Msft Virtual Disk 96.0 MB, Zero
+2026-11-14 14:13:49 [INFO] diskpart: Disk 8 is now the selected disk. | Virtual Disk Service error: | This disk is already online.  | DiskPart succeeded in cleaning the disk.
+2026-11-14 14:13:49 [INFO] diskpart: the disk was already online (harmless).
+2026-11-14 14:13:49 [INFO] Wipe: 96.0 MB of 96.0 MB (100%), 2,001.7 MB/s, about 00:00:00 left
+2026-11-14 14:13:49 [INFO] === Wipe done: Wiped: 48 samples verified. Remember: wear-leveling means retired flash blocks may still hold old data.
+PASS  G18 wipe Zero + verify : 100663296 bytes, 48 samples OK, 1609.5 MB/s, no partitions
+2026-11-14 14:14:09 [INFO] === PREPARE wipe disk 8 Msft Virtual Disk 96.0 MB, Random
+2026-11-14 14:14:46 [INFO] diskpart: Disk 8 is now the selected disk. | Virtual Disk Service error: | This disk is already online.  | DiskPart succeeded in cleaning the disk.
+2026-11-14 14:14:46 [INFO] diskpart: the disk was already online (harmless).
+2026-11-14 14:14:47 [INFO] Wipe: 96.0 MB of 96.0 MB (100%), 488.5 MB/s, about 00:00:00 left
+2026-11-14 14:14:47 [INFO] === Wipe done: Wiped: 49 samples verified. Remember: wear-leveling means retired flash blocks may still hold old data.
+PASS  G19 wipe Random + verify (first MiB zeroed at the end) : 49 samples OK; mid-disk random (4070/4096 non-zero bytes); first MiB zero
+PASS  G20 CLI -Wipe -PreviewOnly mentions wear leveling : plan printed with wear-leveling note
+2026-11-14 14:15:10 [INFO] === PREPARE bootable disk 8 Msft Virtual Disk from C:\ProgramData\USBDoctor\test\ud-hybrid.iso (Raw)
+2026-11-14 14:15:10 [INFO] Computing the ISO SHA-256...
+2026-11-14 14:15:10 [INFO] ISO SHA-256: 477E363D82DA9E1E3A308389ADF2DF51F4BCD9A9CC1DBF2AAF40E74D3CF1D29D
+PS>TerminatingError(): "REFUSED: SHA-256 mismatch. The ISO is 477E363D82DA9E1E3A308389ADF2DF51F4BCD9A9CC1DBF2AAF40E74D3CF1D29D, expected 0000000000000000000000000000000000000000000000000000000000000000. The download is damaged or not the file you think. Nothing was written."
+>> TerminatingError(): "REFUSED: SHA-256 mismatch. The ISO is 477E363D82DA9E1E3A308389ADF2DF51F4BCD9A9CC1DBF2AAF40E74D3CF1D29D, expected 0000000000000000000000000000000000000000000000000000000000000000. The download is damaged or not the file you think. Nothing was written."
+PASS  G21 bootable: SHA-256 mismatch refused, nothing written (refused as expected: REFUSED: SHA-256 mismatch. The ISO is 477E363D82DA9E1E3A308389ADF2DF51F4BCD9A9CC1DBF2AAF40E74D3CF1D29D, expected 0000000000000000000000000000000000000000000000000000000000000000. The download is damaged or not the file you think. Nothing was written.)
+2026-11-14 14:15:18 [INFO] === PREPARE bootable disk 8 Msft Virtual Disk from C:\ProgramData\USBDoctor\test\ud-hybrid.iso (Raw)
+2026-11-14 14:15:18 [INFO] Computing the ISO SHA-256...
+2026-11-14 14:15:18 [INFO] ISO SHA-256: 477E363D82DA9E1E3A308389ADF2DF51F4BCD9A9CC1DBF2AAF40E74D3CF1D29D
+2026-11-14 14:15:55 [INFO] diskpart: Disk 8 is now the selected disk. | Virtual Disk Service error: | This disk is already online.  | DiskPart succeeded in cleaning the disk.
+2026-11-14 14:15:55 [INFO] diskpart: the disk was already online (harmless).
+2026-11-14 14:15:55 [INFO] Writing ISO: 8.0 MB of 8.0 MB, 613.4 MB/s
+2026-11-14 14:15:55 [INFO] Reading the stick back and comparing with the ISO...
+2026-11-14 14:15:55 [INFO] === Bootable OK (raw): 8.0 MB written and verified by read-back.
+PASS  G22 bootable raw: hybrid ISO written + read-back verified : Raw, 8390144 bytes, verified; independent compare OK
+PS>TerminatingError(): "REFUSED: the ISO (200.0 MB) is bigger than the stick (96.0 MB)."
+>> TerminatingError(): "REFUSED: the ISO (200.0 MB) is bigger than the stick (96.0 MB)."
+PASS  G23 bootable raw: ISO bigger than the stick refused (refused as expected: REFUSED: the ISO (200.0 MB) is bigger than the stick (96.0 MB).)
+PS>TerminatingError(Mount-DiskImage): "The running command stopped because the preference variable "ErrorActionPreference" or common parameter is set to Stop: The file or directory is corrupted and unreadable. "
+>> TerminatingError(Mount-DiskImage): "The running command stopped because the preference variable "ErrorActionPreference" or common parameter is set to Stop: The file or directory is corrupted and unreadable. "
+>> TerminatingError(): "REFUSED: Could not open the ISO to look inside (The file or directory is corrupted and unreadable. )."
+>> TerminatingError(): "REFUSED: Could not open the ISO to look inside (The file or directory is corrupted and unreadable. )."
+PASS  G24 bootable: non-hybrid, non-Windows image refused (refused as expected: REFUSED: Could not open the ISO to look inside (The file or directory is corrupted and unreadable. ).)
+Windows source VHD disk 10 at I:
+PASS  G25 test install.wim captured with DISM : install.wim 3147778 bytes
+2026-11-14 14:18:05 [INFO] === PREPARE bootable disk 8 Msft Virtual Disk from C:\ProgramData\USBDoctor\test\ud-winsrc-132832.vhd (Windows)
+2026-11-14 14:18:05 [INFO] Computing the ISO SHA-256...
+2026-11-14 14:18:05 [INFO] ISO SHA-256: 692AE10D256E95E9CA6BF93F88586461A135D36B945F997E523DA02E0BD54149
+2026-11-14 14:18:06 [INFO] Windows installer: 5 files, 3.0 MB; FAT32 partition of 94 MB; install.wim (3.0 MB) will be split
+2026-11-14 14:19:43 [INFO] diskpart:     0 percent completed |   100 percent completed | DiskPart successfully formatted the volume. | DiskPart successfully assigned the drive letter or mount point.
+2026-11-14 14:19:43 [INFO] diskpart: the disk was already online (harmless).
+2026-11-14 14:19:43 [INFO] Copying files I: -> J: (robocopy log: C:\ProgramData\USBDoctor\test\bootable-robocopy.log)
+2026-11-14 14:19:43 [INFO] Splitting install.wim into 1 MB install.swm parts (DISM /Split-Image)...
+2026-11-14 14:19:43 [INFO] no boot\bootsect.exe on the ISO (UEFI boot uses efi\boot and does not need it)
+2026-11-14 14:19:43 [INFO] === Bootable OK (Windows, FAT32): J: holds 4 files + 2 install.swm parts; no boot\bootsect.exe on the ISO (UEFI boot uses efi\boot and does not need it).
+PASS  G26 bootable Windows (FAT32, install.wim split to .swm at 1 MB) : 4 files, 2 swm parts, active FAT32, bootsect: no boot\bootsect.exe on the ISO (UEFI boot uses efi\boot and does not need it)
+PASS  G27 swm parts are a valid split image (dism /Get-WimInfo) : DISM reads install.swm: UDTest
+2026-11-14 14:20:22 [INFO] === PREPARE format disk 8 Msft Virtual Disk: MBR, exFAT 'UDBENCH', 95.0 MB
+2026-11-14 14:21:46 [INFO] diskpart:     0 percent completed |   100 percent completed | DiskPart successfully formatted the volume. | DiskPart successfully assigned the drive letter or mount point.
+2026-11-14 14:21:46 [INFO] diskpart: the disk was already online (harmless).
+2026-11-14 14:21:47 [INFO] === Format OK: I: exFAT 'UDBENCH' 93.8 MB
+PASS  G28 format exFAT for the benchmark : I: exFAT
+2026-11-14 14:21:53 [INFO] === Benchmark (file, unbuffered, verified): 16 MB on I:\ (Msft Virtual Disk)
+2026-11-14 14:21:54 [INFO] Benchmark: seq read 892.3 MB/s, seq write 1101.2 MB/s, 4K read 8653 IOPS, 4K write 10603 IOPS. All data read back correctly. First benchmark of this device in this mode; later runs are compared with it.
+PASS  G29 benchmark file mode (16 MB, verified, temp file deleted) : read 892.3 MB/s, write 1101.2 MB/s, 4K 8653/10603 IOPS
+2026-11-14 14:22:00 [INFO] === Benchmark (file, unbuffered, verified): 16 MB on I:\ (Msft Virtual Disk)
+2026-11-14 14:22:00 [INFO] Benchmark: seq read 2500.4 MB/s, seq write 1676.9 MB/s, 4K read 12810 IOPS, 4K write 22599 IOPS. All data read back correctly. Within 30% of the last 1 run(s).
+PASS  G30 benchmark second run compared with history : 2 runs recorded; Within 30% of the last 1 run(s).
+PS>TerminatingError(): "Not enough free space on I:\ (93.8 MB free, 576.0 MB needed). Use a smaller -SizeMB, or -ReadOnly."
+>> TerminatingError(): "Not enough free space on I:\ (93.8 MB free, 576.0 MB needed). Use a smaller -SizeMB, or -ReadOnly."
+PASS  G31 benchmark refused when too little free space (refused as expected: Not enough free space on I:\ (93.8 MB free, 576.0 MB needed). Use a smaller -SizeMB, or -ReadOnly.)
+2026-11-14 14:22:12 [INFO] === Benchmark (raw, read-only): disk 8 Msft Virtual Disk, first 32 MB + 4 KiB random reads
+2026-11-14 14:22:13 [INFO] Benchmark: seq read 1993.1 MB/s, seq write n/a (read-only) MB/s, 4K read 10233 IOPS, 4K write n/a (read-only) IOPS. No read errors (read-only test, nothing written). First benchmark of this device in this mode; later runs are compared with it.
+PASS  G32 benchmark -ReadOnly raw (nothing written) : raw read 1993.1 MB/s, 4K 10233 IOPS, first MiB unchanged
+PASS  G33 CLI -Benchmark -Letter on the VHD : CLI benchmark OK
+2026-11-14 14:23:30 [INFO] === Rescue copy: disk 10 Msft Virtual Disk serial '' 64.0 MB -> C:\ProgramData\USBDoctor\test\ud-recsrc.img
+2026-11-14 14:23:30 [INFO] Read-only: nothing is written to the drive. Unreadable areas are skipped and zero-filled. If it drops out, unplug and replug it; the copy resumes.
+2026-11-14 14:23:30 [INFO] Rescue: 100.0% (64.0 MB of 64.0 MB), 64.0 MB/s, unreadable 0 KB in 0 range(s)
+2026-11-14 14:23:30 [INFO] === Rescue complete: C:\ProgramData\USBDoctor\test\ud-recsrc.img. Unreadable: 0 KB in 0 range(s) (listed in C:\ProgramData\USBDoctor\test\ud-recsrc.img.badranges.txt).
+2026-11-14 14:23:31 [INFO] Image recorded in the device history (VIRTUAL|60022480F2719F03142BAEC6A8C8CB15); gated repairs no longer need the typed risk phrase.
+PASS  G34 rescue image of the recovery source : 67108864 bytes imaged
+PASS  G35 recovery preview (PhotoRec presence or download link) : preview OK
+2026-11-14 14:24:21 [INFO] === Recover files from C:\ProgramData\USBDoctor\test\ud-recsrc.img -> C:\ProgramData\USBDoctor\test\ud-recovered
+2026-11-14 14:24:42 [INFO] partition 1: no readable file system (try -Carve) [Windows did not mount a volume on it within 15 s]
+2026-11-14 14:24:42 [INFO] === Recovery done: 0 files copied to C:\ProgramData\USBDoctor\test\ud-recovered
+PS>TerminatingError(): "
+
+Image          : C:\ProgramData\USBDoctor\test\ud-recsrc.img
+OutDir         : C:\ProgramData\USBDoctor\test\ud-recovered
+FilesCopied    : 0
+Partitions     : {partition 1: no readable file system (try -Carve) [Windows did not mount a volume on it within 15 s]}
+Carved         : 
+CarveNote      : 
+ImageUnchanged : True
+
+
+
+ files=0 hashSame=True leftovers=0"
+FAIL  G36 recovery copies the files; image unchanged, no wrap left : 
+
+Image          : C:\ProgramData\USBDoctor\test\ud-recsrc.img
+OutDir         : C:\ProgramData\USBDoctor\test\ud-recovered
+FilesCopied    : 0
+Partitions     : {partition 1: no readable file system (try -Carve) [Windows did not mount a volume on it within 15 s]}
+Carved         : 
+CarveNote      : 
+ImageUnchanged : True
+
+
+
+ files=0 hashSame=True leftovers=0
+FAIL  G37 recovered file content matches : returned false
+PASS  G38 CLI -Recover -PreviewOnly : plan printed
+PASS  G39 port map elevated (controllers found, text + HTML) : 1 controller(s), 27 text lines
+PASS  G40 watch dry run with the test history (no write, no task) : 11 devices, 4 alerts; history unchanged; task not registered
+=== Cleanup
+Removed 4 MountedDevices test entries (signatures: C0802F3C,C08029EE,C0802965,C0802A3B,C0802064,C0802303,C0801D71,C0801C81,C0801CC8,C0801F8E; GPT partitions: 2)
+removed ud-capture
+removed ud-recovered
+removed test backup disk3-part1-bootsector-before-restore-20261114-133858.bin
+Leftover VHD/IMG files: 0
+Virtual disks still attached: 0
+DONE pass=110 fail=2 2026-11-14T14:30:04
+**********************
+Windows PowerShell transcript end
+End time: 20261114143004
+**********************

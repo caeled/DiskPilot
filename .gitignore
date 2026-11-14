@@ -35,3 +35,7 @@ robocopy-*.log
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# USBDoctor test logs are published on purpose
+!usbdoctor/tests/logs/
+!usbdoctor/tests/logs/**

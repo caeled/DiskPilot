@@ -1,0 +1,67 @@
+﻿**********************
+Windows PowerShell transcript start
+Start time: 20261114145507
+Username: TESTPC\testuser
+RunAs User: TESTPC\testuser
+Configuration Name: 
+Machine: TESTPC (Microsoft Windows NT 10.0.26300.0)
+Host Application: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\ProgramData\USBDoctor\test\launch-recovery.ps1
+Process ID: 1940
+PSVersion: 5.1.26100.9711
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.9711
+BuildVersion: 10.0.26100.9711
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+AppDir=\\FILESERVER\Share\research\MyApps\Partition\USBDoctor
+=== G. Recovery from a rescue image (recovery-only run)
+2026-11-14 14:56:01 [INFO] === Rescue copy: disk 3 Msft Virtual Disk serial '' 64.0 MB -> C:\ProgramData\USBDoctor\test\ud-recsrc.img
+2026-11-14 14:56:01 [INFO] Read-only: nothing is written to the drive. Unreadable areas are skipped and zero-filled. If it drops out, unplug and replug it; the copy resumes.
+2026-11-14 14:56:01 [INFO] Rescue: 100.0% (64.0 MB of 64.0 MB), 64.0 MB/s, unreadable 0 KB in 0 range(s)
+2026-11-14 14:56:01 [INFO] === Rescue complete: C:\ProgramData\USBDoctor\test\ud-recsrc.img. Unreadable: 0 KB in 0 range(s) (listed in C:\ProgramData\USBDoctor\test\ud-recsrc.img.badranges.txt).
+2026-11-14 14:56:01 [INFO] Image recorded in the device history (VIRTUAL|600224802435F28F84F2A8C1503C463B); gated repairs no longer need the typed risk phrase.
+PASS  G34 rescue image of the recovery source : 67108864 bytes imaged
+PASS  G35 recovery preview (PhotoRec presence or download link) : preview OK
+2026-11-14 14:56:31 [INFO] === Recover files from C:\ProgramData\USBDoctor\test\ud-recsrc.img -> C:\ProgramData\USBDoctor\test\ud-recovered
+2026-11-14 14:56:32 [INFO] Copying F:\ (NTFS 'UDREC') -> C:\ProgramData\USBDoctor\test\ud-recovered\part1-UDREC
+2026-11-14 14:56:33 [INFO] partition 1 (NTFS 'UDREC'): 2 files copied
+2026-11-14 14:56:33 [INFO] === Recovery done: 2 files copied to C:\ProgramData\USBDoctor\test\ud-recovered
+PASS  G36 recovery copies the files; image unchanged, no wrap left : 2 files copied; part folder visible; image hash unchanged; wrap and overlay removed; partition 1 (NTFS 'UDREC'): 2 files copied
+2026-11-14 14:56:34 [INFO] === Recover files from C:\ProgramData\USBDoctor\test\ud-recsrc.img -> C:\ProgramData\USBDoctor\test\ud-recovered-ov
+2026-11-14 14:56:34 [INFO] ForceOverlay: skipping the read-only attach and reading every partition through a temporary overlay.
+2026-11-14 14:56:56 [INFO] diskpart: On computer: TESTPC |     0 percent completed |   100 percent completed | DiskPart successfully created the virtual disk file.
+2026-11-14 14:56:56 [INFO] Overlay: C:\Users\testuser\AppData\Local\Temp\usbdoctor-overlay-9b9b68e724b1.vhd
+2026-11-14 14:56:57 [INFO] Copying F:\ (NTFS 'UDREC') -> C:\ProgramData\USBDoctor\test\ud-recovered-ov\part1-UDREC
+2026-11-14 14:56:59 [INFO] partition 1 (NTFS 'UDREC'): 2 files copied (read through a temporary overlay; any journal replay went there)
+2026-11-14 14:56:59 [INFO] === Recovery done: 2 files copied to C:\ProgramData\USBDoctor\test\ud-recovered-ov
+PASS  G36b recovery through the overlay (-ForceOverlay): files, image unchanged, overlay deleted : 2 files via overlay; image hash unchanged; overlay deleted
+2026-11-14 14:57:49 [INFO] === Rescue copy: disk 3 Msft Virtual Disk serial '' 64.0 MB -> C:\ProgramData\USBDoctor\test\ud-recdirty.img
+2026-11-14 14:57:49 [INFO] Read-only: nothing is written to the drive. Unreadable areas are skipped and zero-filled. If it drops out, unplug and replug it; the copy resumes.
+2026-11-14 14:57:49 [INFO] Rescue: 100.0% (64.0 MB of 64.0 MB), 64.0 MB/s, unreadable 0 KB in 0 range(s)
+2026-11-14 14:57:49 [INFO] === Rescue complete: C:\ProgramData\USBDoctor\test\ud-recdirty.img. Unreadable: 0 KB in 0 range(s) (listed in C:\ProgramData\USBDoctor\test\ud-recdirty.img.badranges.txt).
+2026-11-14 14:57:49 [INFO] Image recorded in the device history (VIRTUAL|60022480FBA056FFDBFB246EEF0FF7A2); gated repairs no longer need the typed risk phrase.
+2026-11-14 14:58:19 [INFO] === Recover files from C:\ProgramData\USBDoctor\test\ud-recdirty.img -> C:\ProgramData\USBDoctor\test\ud-recovered-dirty
+2026-11-14 14:58:26 [INFO] Partition(s) 1: Windows could not mount the file system read-only (usually a journal that must be replayed because the drive was not safely removed). Re-attaching through a temporary overlay disk so any replay writes go there; the image itself stays read-only.
+2026-11-14 14:58:48 [INFO] diskpart: On computer: TESTPC |     0 percent completed |   100 percent completed | DiskPart successfully created the virtual disk file.
+2026-11-14 14:58:49 [INFO] Overlay: C:\Users\testuser\AppData\Local\Temp\usbdoctor-overlay-3304e0e02153.vhd
+2026-11-14 14:58:49 [INFO] Copying F:\ (NTFS 'UDDIRTY') -> C:\ProgramData\USBDoctor\test\ud-recovered-dirty\part1-UDDIRTY
+2026-11-14 14:58:52 [INFO] partition 1 (NTFS 'UDDIRTY'): 1 files copied (read through a temporary overlay; any journal replay went there)
+2026-11-14 14:58:52 [INFO] === Recovery done: 1 files copied to C:\ProgramData\USBDoctor\test\ud-recovered-dirty
+PASS  G36c recovery of an image taken from a mounted, unflushed volume (overlay used if Windows needs it) : journal replay needed: read through the overlay; partition 1 (NTFS 'UDDIRTY'): 1 files copied (read through a temporary overlay; any journal replay went there)
+PASS  G37 recovered file content matches
+PASS  G38 CLI -Recover -PreviewOnly : plan printed
+=== Cleanup
+Removed 1 MountedDevices test entries (signatures: C080143B,C08017DA; GPT partitions: 0)
+removed ud-recovered
+removed ud-recovered-ov
+removed ud-recovered-dirty
+Leftover VHD/IMG files: 0
+Virtual disks still attached: 0
+DONE pass=7 fail=0 2026-11-14T14:59:43
+**********************
+Windows PowerShell transcript end
+End time: 20261114145943
+**********************
