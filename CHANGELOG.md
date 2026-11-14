@@ -2,6 +2,27 @@
 
 All notable changes to this project are documented here.
 
+## [0.3.1] - 2026-11-14
+
+### USBDoctor (`usbdoctor/`) compiled Windows executable
+- `USBDoctor.exe`, built with PS2EXE, sits next to `USBDoctor.Core.psm1` and `USBDoctor.Tools.psm1` and loads them
+  from its own folder. Double-click starts the same window as `USBDoctor.cmd`. It is a console app, so the CLI
+  switches still work. There is no `requireAdmin` manifest: a UAC prompt appears only when the window opens or a
+  repair needs administrator rights, the same way `USBDoctor.cmd` self-elevates. Read-only commands (`-List`,
+  `-Diagnose`, `-?`, `-NoElevate`) do not prompt. `USBDoctor.cmd` remains the script fallback (some antivirus
+  tools may flag packed scripts).
+- The exe embeds the robot-checking-a-disk icon (16 through 256 pixels) and version 0.3.1.0 (product USBDoctor,
+  company/copyright Steven Powell). Rebuild with `usbdoctor/build-exe.ps1`.
+- A plain double-click of an earlier compiled build showed no UAC prompt: `Start-Process` rejected an empty
+  `-ArgumentList`. The exe now omits `ArgumentList` when there are no arguments, and a failed elevation shows the
+  exception in the message box.
+- Health-watch install (`-Watch Install`) from the exe registers the scheduled task as `"USBDoctor.exe" -WatchRun`,
+  not `powershell -File "USBDoctor.exe"`. Installing from `USBDoctor.ps1` still uses `powershell -File`.
+  `-Watch Install -DryRun` prints the planned action and registers nothing.
+
+### Docs
+- USBDoctor README: new "Compiled version" section, files table, rebuild instructions.
+
 ## [0.3.0] - 2026-11-14
 
 ### USBDoctor (`usbdoctor/`) 1.1.0 - Prepare & Tools (not repairs)

@@ -1,7 +1,7 @@
-<#
+﻿<#
  USBDoctor - diagnose USB drive problems read-only, decide who is at fault (drive, connection, this PC, permissions),
  and offer only the repairs that are safe for that state. Follows the USB problem catalog in docs/USB-Problem-Catalog.md (#0-#15 + refusal list).
- GUI:  USBDoctor.ps1            (or double-click USBDoctor.cmd)
+ GUI:  USBDoctor.exe           (or USBDoctor.cmd / USBDoctor.ps1)
  CLI (read-only, no UAC):  -List | -Diagnose [-Disk N] | -Report [-ReportDir X]
       -Tier0Result OtherPortFails|OtherPortWorks|OtherMachineFails|OtherMachineWorks (-Disk N | -Device <identity>)
       -FixImageUsbShift -Image <imageusb.bin/img> [-Out clean.img]      (fixes the IMAGE FILE only)
@@ -57,13 +57,39 @@ param(
     [Parameter(DontShow)][int64]$SplitThresholdBytes = 4294967295
 )
 $ErrorActionPreference = 'Stop'
-$here = Split-Path -Parent $MyInvocation.MyCommand.Path
+# Resolve the program folder as USBDoctor.ps1 or as a PS2EXE-compiled USBDoctor.exe.
+# In a compiled exe, $MyInvocation.MyCommand.Path and $PSScriptRoot are often empty; PS2EXE sets $ScriptRoot instead.
+function Get-UsbDoctorHome([string[]]$Hints) {
+    $seen = @{}
+    foreach ($c in $Hints) {
+        if ([string]::IsNullOrWhiteSpace($c)) { continue }
+        try { $c = [IO.Path]::GetFullPath($c.TrimEnd('\', '/')) } catch { continue }
+        if ($seen.ContainsKey($c)) { continue }
+        $seen[$c] = $true
+        if (Test-Path -LiteralPath (Join-Path $c 'USBDoctor.Core.psm1')) { return $c }
+    }
+    throw 'USBDoctor cannot find USBDoctor.Core.psm1 next to the program. Put USBDoctor.exe (or USBDoctor.ps1), USBDoctor.Core.psm1 and USBDoctor.Tools.psm1 in the same folder.'
+}
+$hereHints = @()
+if ($PSScriptRoot) { $hereHints += $PSScriptRoot }
+if ($MyInvocation.MyCommand.Path) { $hereHints += (Split-Path -Parent $MyInvocation.MyCommand.Path) }
+if ($ScriptRoot) { $hereHints += $ScriptRoot }
+$usbDoctorExe = $null
+try {
+    $procExe = [Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
+    if ($procExe -and ($procExe -match '(?i)\.exe$') -and ($procExe -notmatch '(?i)\\(powershell|pwsh)(\.exe)?$')) {
+        $usbDoctorExe = $procExe
+        $hereHints += (Split-Path -Parent $procExe)
+    }
+} catch {}
+if ([AppDomain]::CurrentDomain.BaseDirectory) { $hereHints += [AppDomain]::CurrentDomain.BaseDirectory }
+$here = Get-UsbDoctorHome $hereHints
 $core = Join-Path $here 'USBDoctor.Core.psm1'
 Import-Module $core -Force -DisableNameChecking
 $tools = Join-Path $here 'USBDoctor.Tools.psm1'
 Import-Module $tools -Force -DisableNameChecking
 Set-UDToolsConfig -LabelsFile $LabelsFile
-$selfPath = $MyInvocation.MyCommand.Path
+$selfPath = $(if ($usbDoctorExe) { $usbDoctorExe } elseif ($MyInvocation.MyCommand.Path) { $MyInvocation.MyCommand.Path } else { Join-Path $here 'USBDoctor.ps1' })
 $hooks = @{}; if ($SimulateRawTimeoutDisk -ge 0) { $hooks.RawTimeoutDisk = $SimulateRawTimeoutDisk }
 Set-UDConfig -LogFile $LogFile -AllowVirtual:$AllowVirtual -HistoryFile $HistoryFile -TestHooks $hooks
 $fileOnlyFix = $FixImageUsbShift -and $Image -and $Disk -lt 0
@@ -85,20 +111,30 @@ function ConvertTo-Unc([string]$p) {
 
 $needAdmin = ((-not $isCli) -and -not $SmokeTest) -or $changeCli -or $Elevate
 if ($needAdmin -and -not (Test-IsAdmin) -and -not $NoElevate) {
-    $argList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-STA')
-    if (-not $isCli) { $argList += @('-WindowStyle', 'Hidden') }
-    $argList += @('-File', ('"{0}"' -f (ConvertTo-Unc $MyInvocation.MyCommand.Path)))
+    $boundArgs = @()
     foreach ($k in $PSBoundParameters.Keys) {
         if ($k -eq 'Elevate') { continue }
         $v = $PSBoundParameters[$k]
-        if ($v -is [switch]) { if ($v) { $argList += "-$k" } }
-        else { $s = "$v"; if ($k -in 'Out', 'BackupDir', 'ReportDir', 'LogFile', 'Image', 'HistoryFile', 'Iso', 'OutDir', 'ToolsDir', 'Html', 'TestPath', 'LabelsFile') { $s = ConvertTo-Unc $s }; $argList += "-$k"; $argList += ('"{0}"' -f $s) }
+        if ($v -is [switch]) { if ($v) { $boundArgs += "-$k" } }
+        else { $s = "$v"; if ($k -in 'Out', 'BackupDir', 'ReportDir', 'LogFile', 'Image', 'HistoryFile', 'Iso', 'OutDir', 'ToolsDir', 'Html', 'TestPath', 'LabelsFile') { $s = ConvertTo-Unc $s }; $boundArgs += "-$k"; $boundArgs += ('"{0}"' -f $s) }
     }
-    if ($isCli -and -not $PauseAtEnd) { $argList += '-PauseAtEnd' }
-    try { Start-Process powershell.exe -Verb RunAs -ArgumentList $argList | Out-Null }
-    catch {
+    if ($isCli -and -not $PauseAtEnd) { $boundArgs += '-PauseAtEnd' }
+    try {
+        if ($usbDoctorExe) {
+            # Start-Process rejects an empty -ArgumentList, so only pass it when there are arguments (a plain double-click has none).
+            $sp = @{ FilePath = (ConvertTo-Unc $usbDoctorExe); Verb = 'RunAs' }
+            if ($boundArgs.Count) { $sp.ArgumentList = $boundArgs }
+            Start-Process @sp | Out-Null
+        } else {
+            $argList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-STA')
+            if (-not $isCli) { $argList += @('-WindowStyle', 'Hidden') }
+            $argList += @('-File', ('"{0}"' -f (ConvertTo-Unc $MyInvocation.MyCommand.Path)))
+            $argList += $boundArgs
+            Start-Process powershell.exe -Verb RunAs -ArgumentList $argList | Out-Null
+        }
+    } catch {
         Add-Type -AssemblyName System.Windows.Forms
-        [Windows.Forms.MessageBox]::Show('USBDoctor needs administrator approval (UAC) to repair drives. Read-only checks work without it: USBDoctor.ps1 -Diagnose', 'USBDoctor') | Out-Null
+        [Windows.Forms.MessageBox]::Show("USBDoctor needs administrator approval (UAC) to repair drives. Read-only checks work without it: USBDoctor -Diagnose`r`n`r`n($($_.Exception.Message))", 'USBDoctor') | Out-Null
     }
     return
 }
@@ -166,7 +202,7 @@ if ($isCli) {
             if ($PreviewOnly) { Write-Host ''; Write-Host "== $($plan.Title)  [PREVIEW ONLY - nothing written]" -ForegroundColor Cyan; Write-Host $plan.Text; return }
             if ($plan.HasFiles -and -not $ConfirmPhrase) {
                 $a = Read-Host 'This drive holds files and has no Rescue image. Make one first? (Y = stop here so you can run -Rescue; N = continue)'
-                if ($a -match '^[Yy]') { throw "Stopped. Make the image first: USBDoctor.ps1 -Rescue -Disk $($plan.DiskNumber)" }
+                if ($a -match '^[Yy]') { throw "Stopped. Make the image first: USBDoctor -Rescue -Disk $($plan.DiskNumber)" }
             }
             $ph = Confirm-Cli $plan
             if ($plan.Destructive) { $P.ConfirmPhrase = $ph }

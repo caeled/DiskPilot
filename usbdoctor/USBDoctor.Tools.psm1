@@ -837,14 +837,25 @@ function Invoke-UsbHealthWatch {
 }
 
 function Get-WatchTaskSpec([string]$ScriptPath, [int]$Minutes) {
-    $a = '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "{0}" -WatchRun' -f $ScriptPath
-    [pscustomobject]@{ TaskName = $script:TaskName; Execute = 'powershell.exe'; Arguments = $a; User = "$env:USERDOMAIN\$env:USERNAME"
+    # A compiled USBDoctor.exe must be launched directly; powershell -File cannot run an .exe.
+    if ($ScriptPath -match '(?i)\.exe$') {
+        $execute = $ScriptPath
+        $a = '-WatchRun'
+    } else {
+        $execute = 'powershell.exe'
+        $a = '-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "{0}" -WatchRun' -f $ScriptPath
+    }
+    [pscustomobject]@{ TaskName = $script:TaskName; Execute = $execute; Arguments = $a; User = "$env:USERDOMAIN\$env:USERNAME"
         Triggers = "at logon of $env:USERNAME, and every $Minutes minutes"; RunLevel = 'Limited (not elevated)'; Hidden = $true }
 }
 
 function Install-UsbHealthWatch {
     param([string]$ScriptPath, [int]$Minutes = 30, [switch]$DryRun)
-    if (-not $ScriptPath) { $ScriptPath = Join-Path $PSScriptRoot 'USBDoctor.ps1' }
+    if (-not $ScriptPath) {
+        $ps1 = Join-Path $PSScriptRoot 'USBDoctor.ps1'
+        $exe = Join-Path $PSScriptRoot 'USBDoctor.exe'
+        $ScriptPath = if (Test-Path -LiteralPath $ps1) { $ps1 } elseif (Test-Path -LiteralPath $exe) { $exe } else { $ps1 }
+    }
     $spec = Get-WatchTaskSpec $ScriptPath $Minutes
     if ($DryRun) { $spec | Add-Member NoteProperty Status 'DRY RUN: nothing was registered.'; return $spec }
     $act = New-ScheduledTaskAction -Execute $spec.Execute -Argument $spec.Arguments
@@ -983,7 +994,7 @@ function Format-UsbPortMap($Map) {
         $lines.Add(''); $lines.Add('Ports with history or a label but nothing plugged in now:')
         foreach ($p in $Map.PortsNotInUse) { $lines.Add("  $($p.PortKey)$(if ($p.Label) { "  <$($p.Label)>" }): $($p.Drops) drop(s), $($p.ReadErrors) read error(s)$(if ($p.Models) { "; drives: $($p.Models)" })") }
     }
-    $lines.Add(''); $lines.Add("Label a port: USBDoctor.ps1 -LabelPort 'front-left' -Disk N  (labels: $($Map.LabelsFile))")
+    $lines.Add(''); $lines.Add("Label a port: USBDoctor -LabelPort 'front-left' -Disk N  (labels: $($Map.LabelsFile))")
     , $lines.ToArray()
 }
 

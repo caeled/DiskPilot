@@ -7,7 +7,8 @@ drive that shows dying-media signatures, and it **never formats anything as a "r
 repairs, a clearly labelled **Prepare & Tools** area formats, wipes, makes bootable sticks, benchmarks, recovers
 files from images, watches drive health and maps USB ports (see [Prepare & Tools](#prepare--tools-not-repairs)).
 
-Plain Windows PowerShell 5.1 (a WinForms window plus a command line). Nothing to build or install.
+Plain Windows PowerShell 5.1 (a WinForms window plus a command line). A compiled `USBDoctor.exe` is included;
+nothing else to install. See [Compiled version](#compiled-version).
 
 ## Order of operations (how every diagnosis runs)
 
@@ -36,17 +37,48 @@ TO CHANGE:    what would have to change for a different answer
 
 ## Start it
 
-Double-click **`USBDoctor.cmd`** and approve the UAC prompt. The window checks every USB drive and shows the
-State and Fault owner for each. Select a drive to see its findings and the four-part assessment.
+Double-click **`USBDoctor.exe`** (or **`USBDoctor.cmd`**) and approve the UAC prompt if you are asked. The window
+checks every USB drive and shows the State and Fault owner for each. Select a drive to see its findings and the
+four-part assessment. The compiled program is described under [Compiled version](#compiled-version); `USBDoctor.cmd`
+is the script fallback.
 
-Read-only checks also work from a normal (non-admin) PowerShell, with no UAC prompt. Without admin, the timed raw
+
+Read-only checks also work from a normal (non-admin) session, with no UAC prompt. Without admin, the timed raw
 read and the boot-sector checks are skipped, and the output says so:
 
 ```
-powershell -File USBDoctor.ps1 -List
-powershell -File USBDoctor.ps1 -Diagnose [-Disk N]
-powershell -File USBDoctor.ps1 -Report [-ReportDir X]     # TXT + HTML; default D:\USB-Backups\Reports (or Documents)
+USBDoctor.exe -List
+USBDoctor.exe -Diagnose [-Disk N]
+USBDoctor.exe -Report [-ReportDir X]     # TXT + HTML; default D:\USB-Backups\Reports (or Documents)
+# Or the script:  powershell -File USBDoctor.ps1 -List
 ```
+
+## Compiled version
+
+`USBDoctor.exe` is a compiled Windows console program for the same window and command line. Keep it **in the same
+folder as `USBDoctor.Core.psm1` and `USBDoctor.Tools.psm1`**; the exe loads those modules from its own folder and
+will not start without them.
+
+Double-click `USBDoctor.exe` to open the window. It does not use an "always run as administrator" manifest. A UAC
+prompt appears only when the window opens or a repair needs administrator rights, the same way `USBDoctor.cmd`
+self-elevates. Read-only commands (`-List`, `-Diagnose`, `-Report`, `-?`) do not ask for UAC. If you want to be
+sure, add `-NoElevate`.
+
+`USBDoctor.cmd` (and `USBDoctor.ps1`) stay as the script fallback. The exe is built with [PS2EXE](https://github.com/MScholtes/PS2EXE).
+Some antivirus tools flag packed PowerShell scripts; if yours does, use `USBDoctor.cmd` instead and treat a
+block as a false positive until you have checked the file hash against this repo.
+
+To rebuild on Windows PowerShell 5.1, from the `usbdoctor` folder:
+
+```
+Install-Module ps2exe -Scope CurrentUser    # once
+.\build-exe.ps1 -OutDir .
+```
+
+`build-exe.ps1` does not request elevation. The default version stamped into the exe is 0.3.1.0. The health-watch
+task (`-Watch Install`) runs `"USBDoctor.exe" -WatchRun` when you install it from the exe, or
+`powershell -File "USBDoctor.ps1" -WatchRun` when you install it from the script. Use `-DryRun` to print the
+planned task without registering it.
 
 ## Coverage table (catalog #0-#15 and refusal list)
 
@@ -149,7 +181,7 @@ Every erasing tool:
 | Bootable maker | `-MakeBootable -Iso file -Disk N [-Mode Auto\|Windows\|Raw] [-Sha256 hex] [-FileSystem FAT32\|NTFS] [-Label X]` | Computes the ISO's SHA-256 and refuses a mismatch with `-Sha256` before writing anything. **Raw** (hybrid ISOs with an MBR in sector 0, which covers most Linux installers): written byte-for-byte like `dd`, then read back and compared. **Windows** (detected by mounting the ISO read-only: `sources\boot.wim`, an install image, `bootmgr`/`efi\boot`): new MBR table, one active FAT32 partition (max 32000 MB), files copied, and `install.wim` over 4 GB split into `install.swm` parts with `dism /Split-Image`. `boot\bootsect.exe /nt60` is run from the ISO if present. Optional NTFS mode boots legacy BIOS only, because no UEFI:NTFS helper is added. ISOs that are neither are refused. | yes, `ERASE N` |
 | Benchmark | `-Benchmark -Letter X [-SizeMB 256]` / `-Benchmark -ReadOnly -Disk N [-SizeMB 256]` | **File mode** (no UAC): one temp file, unbuffered (`FILE_FLAG_NO_BUFFERING` + `WRITE_THROUGH`). It measures sequential write and read, then 4 KiB random write and read (8 s or 4000 operations each). Every 4 KiB block is verified. Free space is checked first and the temp file is always deleted. **-ReadOnly** (administrator): raw reads only, nothing written. Results go to the stick's history (last 20). A run more than 30% slower than the median of the last 5 runs in the same mode is flagged. Refused on dying drives; file mode is also refused on counterfeit sticks. | no (temp file only) |
 | Recover from an image | `-Recover -Image file.img [-OutDir dir] [-Carve] [-ToolsDir dir]` | Works on the **image file only**; the stick is never opened. Attaches the image **read-only**; if a file system needs its journal replayed before Windows will mount it (a stick pulled without Safely Remove), it re-attaches through a temporary overlay disk that takes the writes and is deleted afterwards, so the image is still never written. A raw `.img` gets a temporary 512-byte fixed-VHD footer exposed as a `.vhd` hard link, which is removed afterwards, and the image's length and contents are restored exactly. Readable files are copied with robocopy. `-Carve` runs PhotoRec (TestDisk suite) on the image for deleted or lost files, if PhotoRec is found in PATH, `-ToolsDir`, `C:\ProgramData\USBDoctor\tools`, Program Files or Downloads. If not, USBDoctor prints the download page (https://www.cgsecurity.org/wiki/TestDisk_Download). It **never downloads binaries**. | no |
-| Health watch | `-Watch Install\|Uninstall\|Status\|Run [-DryRun]` | Installs a scheduled task, *USBDoctor Health Watch*, that runs as you and **not elevated**: at logon and every 30 minutes, in a hidden window. Each pass reads the event logs for read errors, drop-outs and capacity changes per USB drive, stores them in `history.json`, and shows a notification when a drive's errors rise (3 or more new read errors, or new drops) or its verdict changes (OK, ERRORS or DYING). Notifications use a Windows toast, then BurntToast, then `msg.exe`. `-DryRun` computes and prints only. | no |
+| Health watch | `-Watch Install\|Uninstall\|Status\|Run [-DryRun]` | Installs a scheduled task, *USBDoctor Health Watch*, that runs as you and **not elevated**: at logon and every 30 minutes, in a hidden window. Installed from the exe, the task runs `USBDoctor.exe -WatchRun`; installed from the script, it runs `powershell -File USBDoctor.ps1 -WatchRun`. Each pass reads the event logs for read errors, drop-outs and capacity changes per USB drive, stores them in `history.json`, and shows a notification when a drive's errors rise (3 or more new read errors, or new drops) or its verdict changes (OK, ERRORS or DYING). Notifications use a Windows toast, then BurntToast, then `msg.exe`. `-DryRun` computes and prints only. | no |
 | Port map | `-PortMap [-Html file]`, `-LabelPort 'front-left' (-Disk N \| -Port key)` | Tree of USB host controllers, root hubs, hubs, ports and devices, with errors and drops per port from the history. Ports with problems are marked. Text on the console, an HTML section in `-Report`, and a tree on the window's **Port map** tab. Your port labels are kept in `C:\ProgramData\USBDoctor\port-labels.json` (`-LabelPort -` removes one). | no |
 
 **Wipe and wear leveling.** USB flash controllers remap worn blocks internally. Old data in blocks the controller
@@ -161,22 +193,23 @@ data unencrypted, destroy it physically.
 
 | File | Purpose |
 |---|---|
-| `USBDoctor.cmd` | Launcher (double-click); self-elevates through the UNC path |
-| `USBDoctor.ps1` | Window + command line |
+| `USBDoctor.exe` | Compiled window + command line (keep next to the two `.psm1` files); see [Compiled version](#compiled-version) |
+| `USBDoctor.ico` | Icon used by the exe (16–256 px) |
+| `USBDoctor.cmd` | Script launcher (double-click fallback); self-elevates through the UNC path |
+| `USBDoctor.ps1` | Window + command line (the script source) |
 | `USBDoctor.Core.psm1` | Diagnosis and repair logic (inventory, diagnosis, Tier 0, gate, repairs, rescue, report); no format code |
 | `USBDoctor.Tools.psm1` | Prepare & Tools (not repairs): format, wipe, bootable maker, benchmark, image recovery, health watch, port map |
+| `build-exe.ps1` | Rebuild `USBDoctor.exe` with PS2EXE |
 | `C:\ProgramData\USBDoctor\USBDoctor.log` | Log of every check and change |
 | `C:\ProgramData\USBDoctor\history.json` | Per-stick history: ports, errors/drops, raw reads, Tier 0 results, read-only clears, capacity tests, images, benchmarks, prepare actions, watch passes |
 | `C:\ProgramData\USBDoctor\port-labels.json` | Your names for USB ports (port map) |
 
 ## Known limitations
 
-- **Test status (2026-11-14):** the 1.1.0 build (repairs plus Prepare & Tools) is parse-checked, import-checked and
-  dry-run checked without admin rights. The benchmark logic ran against a test folder, the image-wrap round trip
-  ran on a test file, and the plans (previews), refusals, port map, labels and a watch dry run ran against real
-  hardware read-only. The elevated test run against virtual disks (VHDs), which covers the v2 repairs and the new
-  format, wipe, bootable, raw benchmark and recovery paths, is **still pending**. Treat the repairs and the Prepare
-  tools as beta and try them on a disposable stick first.
+- **Test status (2026-11-14):** the 0.3.x build (repairs plus Prepare & Tools) is parse-checked, import-checked and
+  dry-run checked without admin rights. The elevated VHD run and the recovery retests are recorded in
+  [CHANGELOG](../CHANGELOG.md). Treat the repairs and the Prepare tools as beta and try them on a disposable stick
+  first.
 
 - Without administrator rights, the timed raw read (#3), boot-sector, GPT and ImageUSB checks are skipped. Dying
   detection then relies on the event log only.
@@ -190,8 +223,8 @@ data unencrypted, destroy it physically.
   maker adds no UEFI:NTFS helper, so NTFS mode boots legacy BIOS only (FAT32 mode, the default, boots both).
   Wipe can't guarantee erasure on flash (see above).
 - Recovery attaches images through Windows (administrator). PhotoRec can't read `.vhdx`; carve a raw `.img` instead.
-- The health watch task starts a hidden PowerShell window, which may flash briefly. Toast display depends on
-  Windows notification settings.
+- The health watch task starts a hidden window (PowerShell when installed from the script, or USBDoctor.exe when
+  installed from the exe), which may flash briefly. Toast display depends on Windows notification settings.
 - The port map takes 10-20 s (PnP property queries) and lists ports that have a device attached, plus labelled or
   previously used ports that are empty now.
 - A hung raw read is abandoned, not killed. Windows may keep that thread until the stick is unplugged.
