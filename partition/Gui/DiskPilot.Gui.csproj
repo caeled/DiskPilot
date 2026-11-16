@@ -8,6 +8,7 @@
     <Compile Remove="Tests/**/*.cs" />
     <ProjectReference Include="../DiskPilot.csproj" />
     <AvaloniaResource Include="banner.png" />
+    <AvaloniaResource Include="../README.md" Link="docs/partition-readme.md" />
     <PackageReference Include="Avalonia.Desktop" Version="11.3.9" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.9" />
   </ItemGroup>

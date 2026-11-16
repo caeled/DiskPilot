@@ -32,7 +32,7 @@ public sealed class MainWindow : Window
             Group("_File", Item("_Refresh devices", Refresh), Item("E_xit", () => { Close(); return Task.CompletedTask; })),
             Group("_Disk", Item("View _details", ShowDetails), Item("_Initialize GPT…", () => Operation("init"))),
             Group("_Partition", Item("_Create…", () => Operation("create")), Item("_Delete…", () => Operation("delete")), Item("_Format…", () => Operation("format"))),
-            Group("_Help", Item("_Safety and usage", Help), Item("_About", () => Message("About DiskPilot", "DiskPilot • .NET 10 / Avalonia\nWindows and Linux native disk management.\nGPT writes; MBR discovery only.\nSee the bundled README for dependencies and validation limits.")))
+            Group("_Help", Item("_Safety and usage", Help), Item("_Documentation", Documentation), Item("_About", () => Message("About DiskPilot", "DiskPilot • .NET 10 / Avalonia\nWindows and Linux native disk management.\nGPT writes; MBR discovery only.\nSee the bundled README for dependencies and validation limits.")))
         };
         var root = new DockPanel(); DockPanel.SetDock(menu, Dock.Top); root.Children.Add(menu);
         var footer = new Border { Padding = new Thickness(18, 10), Background = Brushes.WhiteSmoke, Child = status };
@@ -97,6 +97,16 @@ public sealed class MainWindow : Window
     static string Summary(Disk d) => $"Disk: {d.Id} • {d.Model}\nSize: {d.Size:N0} bytes • Table: {d.Table} • Bus: {d.Bus}\nIdentity: {d.Identity}\nFingerprint: {d.Fingerprint}\nProtection: {(d.ReadOnly ? "Read-only. " : "")}{(d.Blocks.Length > 0 ? string.Join("; ", d.Blocks) : "No protection flags reported; final checks still required.")}";
     Task ShowDetails() => Message("Device and partition details", Summary(Selected) + "\n\n" + JsonSerializer.Serialize(Selected.Partitions, new JsonSerializerOptions { WriteIndented = true }));
     Task Help() => Message("Safety and usage", "1. Refresh and verify the device model, size and identity.\n2. Select a partition for Delete or Format.\n3. Choose a task and review its dry-run preview.\n4. Apply requires Administrator/root and the exact confirmation phrase.\n\nUnmount all partitions first. System/protected disks are refused. The GUI never elevates itself or unmounts disks automatically.\n\nStart elevated using your OS's trusted launch mechanism. On Linux, root GUI access depends on your desktop session; the CLI remains available if elevated GUI access is unavailable.\n\nInitialization and formatting destroy data. No undo is available. Use disposable media first. See README for limitations.");
+    async Task Documentation()
+    {
+        try
+        {
+            using var stream = AssetLoader.Open(new Uri("avares://DiskPilot.Gui/docs/partition-readme.md"));
+            using var reader = new StreamReader(stream);
+            await Message("DiskPilot documentation", await reader.ReadToEndAsync());
+        }
+        catch (Exception ex) { await Message("DiskPilot documentation", "The bundled documentation could not be opened. " + ex.Message); }
+    }
     async Task Operation(string action)
     {
         var disk = Selected;

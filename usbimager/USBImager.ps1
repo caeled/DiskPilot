@@ -94,7 +94,7 @@ $font = New-Object Drawing.Font('Segoe UI', 9)
 
 $form = New-Object Windows.Forms.Form
 $form.Text = 'USBImager - capture and burn USB drives'
-$form.Size = New-Object Drawing.Size(900, 940); $form.MinimumSize = $form.Size
+$form.Size = New-Object Drawing.Size(900, 968); $form.MinimumSize = $form.Size
 $form.StartPosition = 'CenterScreen'; $form.Font = $font
 
 # Banner (decoration only: if banner.png is missing or unreadable, the tool opens without it)
@@ -102,8 +102,9 @@ try {
     $bannerFile = Join-Path $here 'banner.png'
     if (Test-Path -LiteralPath $bannerFile) {
         $picBanner = New-Object Windows.Forms.PictureBox
-        $picBanner.Location = New-Object Drawing.Point(0, 0)
+        $picBanner.Location = New-Object Drawing.Point(0, 28)
         $picBanner.Size = New-Object Drawing.Size(900, 220)
+        $picBanner.Top = 28
         $picBanner.SizeMode = 'Zoom'
         $picBanner.BackColor = [Drawing.Color]::FromArgb(248, 244, 233)
         $picBanner.Anchor = 'Top,Left,Right'
@@ -117,14 +118,41 @@ function New-Ctl($type, $x, $y, $w, $h, $text, $parent) {
     if ($null -ne $text) { $c.Text = $text }; $parent.Controls.Add($c); $c
 }
 
-$lblDisks = New-Ctl Label 12 230 700 20 'USB drives (system and internal disks are never shown):' $form
-$btnRefresh = New-Ctl Button 770 226 100 26 'Refresh' $form
-$lv = New-Ctl ListView 12 254 858 150 $null $form
+# Help menu (Documentation opens the bundled README; About is a one-line summary)
+$script:readmePath = Join-Path $here 'README.md'
+$menuStrip = New-Object Windows.Forms.MenuStrip
+$helpMenu = New-Object Windows.Forms.ToolStripMenuItem('Help')
+$docItem = New-Object Windows.Forms.ToolStripMenuItem('Documentation')
+$docItem.add_Click({
+    $text = if (Test-Path -LiteralPath $script:readmePath) { Get-Content -LiteralPath $script:readmePath -Raw } else { 'README.md was not found next to USBImager.' }
+    $docForm = New-Object Windows.Forms.Form
+    $docForm.Text = 'USBImager documentation'
+    $docForm.Size = New-Object Drawing.Size(760, 640)
+    $docForm.StartPosition = 'CenterParent'
+    $docBox = New-Object Windows.Forms.TextBox
+    $docBox.Multiline = $true; $docBox.ReadOnly = $true; $docBox.ScrollBars = 'Vertical'
+    $docBox.Dock = 'Fill'; $docBox.Font = New-Object Drawing.Font('Consolas', 9)
+    $docBox.Text = $text
+    $docBox.SelectionStart = 0
+    $docForm.Controls.Add($docBox)
+    [void]$docForm.ShowDialog($form)
+})
+$aboutItem = New-Object Windows.Forms.ToolStripMenuItem('About USBImager')
+$aboutItem.add_Click({ [Windows.Forms.MessageBox]::Show('USBImager captures a USB stick to an image, and burns an image to another USB stick using the whole drive. Only USB disks are ever listed or touched.', 'About USBImager') | Out-Null })
+[void]$helpMenu.DropDownItems.Add($docItem)
+[void]$helpMenu.DropDownItems.Add($aboutItem)
+[void]$menuStrip.Items.Add($helpMenu)
+$form.Controls.Add($menuStrip)
+$form.MainMenuStrip = $menuStrip
+
+$lblDisks = New-Ctl Label 12 258 700 20 'USB drives (system and internal disks are never shown):' $form
+$btnRefresh = New-Ctl Button 770 254 100 26 'Refresh' $form
+$lv = New-Ctl ListView 12 282 858 150 $null $form
 $lv.View = 'Details'; $lv.FullRowSelect = $true; $lv.MultiSelect = $false; $lv.HideSelection = $false
 [void]$lv.Columns.Add('Disk', 45); [void]$lv.Columns.Add('Model', 190); [void]$lv.Columns.Add('Size', 80); [void]$lv.Columns.Add('Bus', 70); [void]$lv.Columns.Add('Volumes', 460)
 $lv.Anchor = 'Top,Left,Right'; $btnRefresh.Anchor = 'Top,Right'
 
-$gCap = New-Ctl GroupBox 12 412 858 110 '1. Capture: save the selected drive to an image' $form
+$gCap = New-Ctl GroupBox 12 440 858 110 '1. Capture: save the selected drive to an image' $form
 $gCap.Anchor = 'Top,Left,Right'
 New-Ctl Label 12 26 80 20 'Save to:' $gCap | Out-Null
 $txtOut = New-Ctl TextBox 95 23 520 23 $OutDir $gCap
@@ -140,7 +168,7 @@ $btnCapture = New-Ctl Button 722 22 120 58 'Capture' $gCap
 $btnCapture.Font = New-Object Drawing.Font('Segoe UI', 10, [Drawing.FontStyle]::Bold)
 New-Ctl Label 95 84 600 20 'Name is optional (defaults to the drive label). The drive being captured is only read.' $gCap | Out-Null
 
-$gBurn = New-Ctl GroupBox 12 530 858 120 '2. Burn: restore an image onto the selected drive (ERASES that drive)' $form
+$gBurn = New-Ctl GroupBox 12 558 858 120 '2. Burn: restore an image onto the selected drive (ERASES that drive)' $form
 $gBurn.Anchor = 'Top,Left,Right'
 New-Ctl Label 12 26 80 20 'Image:' $gBurn | Out-Null
 $txtImg = New-Ctl TextBox 95 23 520 23 '' $gBurn
@@ -154,10 +182,10 @@ $lblImgInfo = New-Ctl Label 95 86 610 28 '.vhdx images: new single partition ove
 $btnBurn = New-Ctl Button 722 22 120 58 'Burn...' $gBurn
 $btnBurn.Font = New-Object Drawing.Font('Segoe UI', 10, [Drawing.FontStyle]::Bold); $btnBurn.ForeColor = [Drawing.Color]::DarkRed
 
-$progress = New-Ctl ProgressBar 12 660 700 18 $null $form
+$progress = New-Ctl ProgressBar 12 688 700 18 $null $form
 $progress.Style = 'Marquee'; $progress.MarqueeAnimationSpeed = 0; $progress.Anchor = 'Top,Left,Right'
-$btnLog = New-Ctl Button 720 656 150 26 'Open log folder' $form; $btnLog.Anchor = 'Top,Right'
-$txtLog = New-Ctl TextBox 12 688 858 200 '' $form
+$btnLog = New-Ctl Button 720 684 150 26 'Open log folder' $form; $btnLog.Anchor = 'Top,Right'
+$txtLog = New-Ctl TextBox 12 716 858 200 '' $form
 $txtLog.Multiline = $true; $txtLog.ScrollBars = 'Vertical'; $txtLog.ReadOnly = $true; $txtLog.WordWrap = $false
 $txtLog.Font = New-Object Drawing.Font('Consolas', 9); $txtLog.Anchor = 'Top,Bottom,Left,Right'
 
