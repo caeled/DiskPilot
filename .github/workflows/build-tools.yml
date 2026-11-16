@@ -1,0 +1,52 @@
+name: Build tools with banners
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diskpilot-gui:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Publish DiskPilot GUI (self-contained)
+        shell: pwsh
+        run: dotnet publish partition/Gui/DiskPilot.Gui.csproj -c Release -r win-x64 --self-contained true -o publish/DiskPilot
+      - name: Verify banner embedded in DiskPilot.Gui.dll
+        shell: pwsh
+        run: |
+          $dll = 'publish/DiskPilot/DiskPilot.Gui.dll'
+          if (-not (Test-Path $dll)) { throw "Missing $dll" }
+          $text = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($dll))
+          if ($text -notmatch 'banner\.png') { throw 'banner.png resource NOT found in DiskPilot.Gui.dll' }
+          Write-Host 'banner.png resource verified inside DiskPilot.Gui.dll'
+      - name: Zip DiskPilot
+        shell: pwsh
+        run: Compress-Archive -Path publish/DiskPilot/* -DestinationPath DiskPilot-win-x64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DiskPilot-win-x64
+          path: DiskPilot-win-x64.zip
+
+  usbimager:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Smoke test USBImager GUI (builds the form, banner included)
+        shell: powershell
+        run: |
+          $out = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File usbimager/USBImager.ps1 -SmokeTest -NoElevate 2>&1 | Out-String
+          Write-Host $out
+          if ($out -notmatch 'SMOKE OK') { throw 'USBImager smoke test failed' }
+      - name: Zip USBImager
+        shell: pwsh
+        run: Compress-Archive -Path usbimager/USBImager.ps1, usbimager/USBImager.cmd, usbimager/USBImager.Core.psm1, usbimager/banner.png, usbimager/README.md -DestinationPath USBImager.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: USBImager
+          path: USBImager.zip
