@@ -4,6 +4,8 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 
 namespace DiskPilot.Gui;
 public sealed class MainWindow : Window
@@ -36,6 +38,12 @@ public sealed class MainWindow : Window
         var footer = new Border { Padding = new Thickness(18, 10), Background = Brushes.WhiteSmoke, Child = status };
         DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
         var body = new StackPanel { Margin = new Thickness(24), Spacing = 12 };
+        try
+        {
+            using var bannerStream = AssetLoader.Open(new Uri("avares://DiskPilot.Gui/banner.png"));
+            body.Children.Add(new Image { Source = new Bitmap(bannerStream), Height = 200, Stretch = Stretch.UniformToFill });
+        }
+        catch { /* The banner is decoration; never let it block the tool. */ }
         body.Children.Add(new TextBlock { Text = "DiskPilot", FontSize = 28, FontWeight = FontWeight.SemiBold });
         body.Children.Add(new TextBlock { Text = demo ? "DEMO • sample device only. Applying changes is disabled." : "Select a device, review its layout, then preview a task. No changes happen until you confirm.", TextWrapping = TextWrapping.Wrap });
         body.Children.Add(new TextBlock { Text = "Device", FontWeight = FontWeight.SemiBold });
